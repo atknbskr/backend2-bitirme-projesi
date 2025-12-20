@@ -22,7 +22,7 @@ exports.getAllCourses = async (req, res) => {
 
     res.json({
       success: true,
-      courses,
+      data: courses,
     });
   } catch (error) {
     console.error("Ders listeleme hatası:", error);
@@ -69,7 +69,7 @@ exports.getMyCourses = async (req, res) => {
 
     res.json({
       success: true,
-      courses,
+      data: courses,
     });
   } catch (error) {
     console.error("Ders listeleme hatası:", error);

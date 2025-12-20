@@ -134,7 +134,24 @@ exports.studentLogin = async (req, res) => {
 // Akademisyen Kayıt
 exports.academicianRegister = async (req, res) => {
   try {
-    const { email, password, firstName, lastName, username } = req.body;
+    const { email, password, firstName, lastName, username, universityId } = req.body;
+
+    // Üniversite ID kontrolü
+    if (!universityId) {
+      return res.status(400).json({
+        success: false,
+        message: "Üniversite seçimi zorunludur",
+      });
+    }
+
+    // Üniversite var mı kontrol et
+    const university = await sql`SELECT id, name FROM universities WHERE id = ${universityId}`;
+    if (university.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Geçersiz üniversite",
+      });
+    }
 
     // Email kontrolü
     const existingUser = await sql`SELECT id FROM users WHERE email = ${email}`;
@@ -168,8 +185,8 @@ exports.academicianRegister = async (req, res) => {
 
     // Akademisyen kaydı oluştur
     await sql`
-      INSERT INTO academicians (user_id, username)
-      VALUES (${newUser[0].id}, ${username})
+      INSERT INTO academicians (user_id, username, university_id)
+      VALUES (${newUser[0].id}, ${username}, ${universityId})
     `;
 
     // Token oluştur
@@ -186,6 +203,8 @@ exports.academicianRegister = async (req, res) => {
         lastName: newUser[0].last_name,
         userType: "academician",
         username,
+        universityId: universityId,
+        universityName: university[0].name,
       },
     });
   } catch (error) {
@@ -204,9 +223,11 @@ exports.academicianLogin = async (req, res) => {
 
     // Akademisyeni bul
     const academician = await sql`
-      SELECT u.id, u.email, u.password_hash, u.user_type, u.first_name, u.last_name, a.username
+      SELECT u.id, u.email, u.password_hash, u.user_type, u.first_name, u.last_name, 
+             a.username, a.university_id, uni.name as university_name
       FROM users u
       JOIN academicians a ON u.id = a.user_id
+      LEFT JOIN universities uni ON a.university_id = uni.id
       WHERE a.username = ${username}
     `;
 
@@ -243,6 +264,8 @@ exports.academicianLogin = async (req, res) => {
         lastName: academician[0].last_name,
         userType: "academician",
         username: academician[0].username,
+        universityId: academician[0].university_id,
+        universityName: academician[0].university_name,
       },
     });
   } catch (error) {

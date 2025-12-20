@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { body, validationResult } = require("express-validator");
 const adminController = require("../controllers/adminController");
-const academicianOrAdminAuth = require("../middleware/academicianOrAdminAuth");
+const adminAuth = require("../middleware/adminAuth");
 
 // Validation middleware
 const validate = (req, res, next) => {
@@ -20,10 +20,10 @@ const validate = (req, res, next) => {
 // Tüm üniversiteleri listele (Herkese açık)
 router.get("/", adminController.getAllUniversities);
 
-// Üniversite ekle (Akademisyen veya Admin)
+// Üniversite ekle (Sadece Admin)
 router.post(
   "/",
-  academicianOrAdminAuth,
+  adminAuth,
   [
     body("name").notEmpty().withMessage("Üniversite adı gerekli"),
   ],
@@ -31,19 +31,20 @@ router.post(
   adminController.addUniversity
 );
 
-// Üniversite güncelle (Akademisyen veya Admin)
+// Üniversite güncelle (Sadece Admin)
 router.put(
   "/:id",
-  academicianOrAdminAuth,
+  adminAuth,
   adminController.updateUniversity
 );
 
-// Üniversite sil (Akademisyen veya Admin)
+// Üniversite sil (Sadece Admin)
 router.delete(
   "/:id",
-  academicianOrAdminAuth,
+  adminAuth,
   adminController.deleteUniversity
 );
 
 module.exports = router;
+
 

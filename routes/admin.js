@@ -62,6 +62,10 @@ router.post("/universities", adminAuth, adminController.addUniversity);
 router.put("/universities/:id", adminAuth, adminController.updateUniversity);
 router.delete("/universities/:id", adminAuth, adminController.deleteUniversity);
 
+// Akademisyen yönetimi
+router.get("/academicians", adminAuth, adminController.getAcademicians);
+router.put("/academicians/:userId/university", adminAuth, adminController.assignUniversityToAcademician);
+
 module.exports = router;
 
 

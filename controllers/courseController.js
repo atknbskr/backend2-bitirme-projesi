@@ -38,9 +38,9 @@ exports.getMyCourses = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    // Akademisyen ID'sini bul
+    // Akademisyen ID'sini ve üniversitesini bul
     const academician = await sql`
-      SELECT id FROM academicians WHERE user_id = ${userId}
+      SELECT id, university_id FROM academicians WHERE user_id = ${userId}
     `;
 
     if (academician.length === 0) {
@@ -50,6 +50,7 @@ exports.getMyCourses = async (req, res) => {
       });
     }
 
+    // Sadece kendi üniversitesindeki ve kendine ait dersleri listele
     const courses = await sql`
       SELECT 
         id,
@@ -62,6 +63,7 @@ exports.getMyCourses = async (req, res) => {
         created_at
       FROM courses
       WHERE academician_id = ${academician[0].id}
+        AND (university_id = ${academician[0].university_id} OR university_id IS NULL)
       ORDER BY created_at DESC
     `;
 
@@ -93,12 +95,13 @@ exports.createCourse = async (req, res) => {
     }
 
     let finalAcademicianId = null;
+    let finalUniversityId = null;
 
     // Admin ise, academicianId parametresini kullanabilir veya null bırakabilir
     if (userType === 'admin') {
       if (academicianId) {
         // Belirtilen akademisyen ID'sini kontrol et
-        const academician = await sql`SELECT id FROM academicians WHERE id = ${academicianId}`;
+        const academician = await sql`SELECT id, university_id FROM academicians WHERE id = ${academicianId}`;
         if (academician.length === 0) {
           return res.status(400).json({
             success: false,
@@ -106,12 +109,13 @@ exports.createCourse = async (req, res) => {
           });
         }
         finalAcademicianId = academicianId;
+        finalUniversityId = academician[0].university_id;
       }
       // Admin için academician_id null olabilir (sistem dersi)
     } else {
-      // Akademisyen ise, kendi ID'sini kullan
+      // Akademisyen ise, kendi ID'sini ve üniversitesini kullan
       const academician = await sql`
-        SELECT id FROM academicians WHERE user_id = ${userId}
+        SELECT id, university_id FROM academicians WHERE user_id = ${userId}
       `;
 
       if (academician.length === 0) {
@@ -120,13 +124,22 @@ exports.createCourse = async (req, res) => {
           message: "Bu işlem için akademisyen yetkisi gereklidir. Lütfen akademisyen olarak kayıt olun.",
         });
       }
+
+      if (!academician[0].university_id) {
+        return res.status(403).json({
+          success: false,
+          message: "Ders eklemek için bir üniversiteye bağlı olmanız gerekir.",
+        });
+      }
+
       finalAcademicianId = academician[0].id;
+      finalUniversityId = academician[0].university_id;
     }
 
     // Ders oluştur
     const newCourse = await sql`
-      INSERT INTO courses (academician_id, course_name, course_code, description, category)
-      VALUES (${finalAcademicianId}, ${courseName}, ${courseCode || null}, ${description || null}, ${category || null})
+      INSERT INTO courses (academician_id, course_name, course_code, description, category, university_id)
+      VALUES (${finalAcademicianId}, ${courseName}, ${courseCode || null}, ${description || null}, ${category || null}, ${finalUniversityId})
       RETURNING *
     `;
 
@@ -162,9 +175,9 @@ exports.deleteCourse = async (req, res) => {
         });
       }
     } else {
-      // Akademisyen ise, sadece kendi derslerini silebilir
+      // Akademisyen ise, sadece kendi üniversitesindeki kendi derslerini silebilir
       const academician = await sql`
-        SELECT id FROM academicians WHERE user_id = ${userId}
+        SELECT id, university_id FROM academicians WHERE user_id = ${userId}
       `;
 
       if (academician.length === 0) {
@@ -174,10 +187,12 @@ exports.deleteCourse = async (req, res) => {
         });
       }
 
-      // Dersin sahibi kontrolü
+      // Dersin sahibi ve üniversite kontrolü
       const course = await sql`
         SELECT id FROM courses 
-        WHERE id = ${courseId} AND academician_id = ${academician[0].id}
+        WHERE id = ${courseId} 
+          AND academician_id = ${academician[0].id}
+          AND (university_id = ${academician[0].university_id} OR university_id IS NULL)
       `;
 
       if (course.length === 0) {

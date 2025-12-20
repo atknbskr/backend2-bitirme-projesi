@@ -97,3 +97,5 @@ async function fixUniversitiesTable() {
 
 fixUniversitiesTable();
 
+
+

@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS universities (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) UNIQUE NOT NULL,
     city VARCHAR(100),
+    type VARCHAR(20) DEFAULT 'devlet',
     website VARCHAR(255),
     description TEXT,
     logo_url VARCHAR(500),

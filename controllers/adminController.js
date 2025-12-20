@@ -347,7 +347,7 @@ exports.getAllUniversities = async (req, res) => {
 // Üniversite ekle
 exports.addUniversity = async (req, res) => {
   try {
-    const { name, city, website, description, logoUrl, contactEmail, contactPhone } = req.body;
+    const { name, city, type, website, description, logoUrl, contactEmail, contactPhone } = req.body;
 
     if (!name) {
       return res.status(400).json({
@@ -368,8 +368,8 @@ exports.addUniversity = async (req, res) => {
     }
 
     const newUniversity = await sql`
-      INSERT INTO universities (name, city, website, description, logo_url, contact_email, contact_phone)
-      VALUES (${name}, ${city || null}, ${website || null}, ${description || null}, 
+      INSERT INTO universities (name, city, type, website, description, logo_url, email, phone)
+      VALUES (${name}, ${city || null}, ${type || 'devlet'}, ${website || null}, ${description || null}, 
               ${logoUrl || null}, ${contactEmail || null}, ${contactPhone || null})
       RETURNING *
     `;
@@ -392,7 +392,7 @@ exports.addUniversity = async (req, res) => {
 exports.updateUniversity = async (req, res) => {
   try {
     const universityId = req.params.id;
-    const { name, city, website, description, logoUrl, contactEmail, contactPhone } = req.body;
+    const { name, city, type, website, description, logoUrl, contactEmail, contactPhone } = req.body;
 
     // Üniversite var mı kontrol et
     const university = await sql`
@@ -423,11 +423,12 @@ exports.updateUniversity = async (req, res) => {
       SET 
         name = COALESCE(${name}, name),
         city = COALESCE(${city}, city),
+        type = COALESCE(${type}, type),
         website = COALESCE(${website}, website),
         description = COALESCE(${description}, description),
         logo_url = COALESCE(${logoUrl}, logo_url),
-        contact_email = COALESCE(${contactEmail}, contact_email),
-        contact_phone = COALESCE(${contactPhone}, contact_phone),
+        email = COALESCE(${contactEmail}, email),
+        phone = COALESCE(${contactPhone}, phone),
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ${universityId}
     `;

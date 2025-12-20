@@ -7,6 +7,7 @@ const authRoutes = require("./routes/auth");
 const courseRoutes = require("./routes/courses");
 const favoriteRoutes = require("./routes/favorites");
 const adminRoutes = require("./routes/admin");
+const universityRoutes = require("./routes/universities");
 
 const app = express();
 const PORT = process.env.PORT || 5500;
@@ -33,6 +34,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/courses", courseRoutes);
 app.use("/api/favorites", favoriteRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/universities", universityRoutes);
 
 // Health check
 app.get("/api/health", (req, res) => {

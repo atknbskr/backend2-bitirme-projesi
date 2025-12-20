@@ -7,7 +7,8 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "init-db": "node database/initDatabase.js",
-    "create-admin": "node database/createAdmin.js"
+    "create-admin": "node database/createAdmin.js",
+    "create-students": "node database/createStudents.js"
   },
   "keywords": [
     "campus",

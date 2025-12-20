@@ -44,6 +44,9 @@ CREATE TABLE IF NOT EXISTS courses (
     category VARCHAR(100),
     university_count INTEGER DEFAULT 0,
     student_count INTEGER DEFAULT 0,
+    application_deadline DATE,
+    start_date DATE,
+    end_date DATE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -64,5 +67,6 @@ CREATE INDEX IF NOT EXISTS idx_academicians_username ON academicians(username);
 CREATE INDEX IF NOT EXISTS idx_admins_admin_code ON admins(admin_code);
 CREATE INDEX IF NOT EXISTS idx_courses_academician_id ON courses(academician_id);
 CREATE INDEX IF NOT EXISTS idx_courses_category ON courses(category);
+CREATE INDEX IF NOT EXISTS idx_courses_application_deadline ON courses(application_deadline);
 CREATE INDEX IF NOT EXISTS idx_favorites_student_id ON favorites(student_id);
 CREATE INDEX IF NOT EXISTS idx_favorites_course_id ON favorites(course_id);

@@ -8,7 +8,8 @@
     "dev": "nodemon server.js",
     "init-db": "node database/initDatabase.js",
     "create-admin": "node database/createAdmin.js",
-    "create-students": "node database/createStudents.js"
+    "create-students": "node database/createStudents.js",
+    "update-deadlines": "node database/updateApplicationDeadlines.js"
   },
   "keywords": [
     "campus",

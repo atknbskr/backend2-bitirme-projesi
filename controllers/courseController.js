@@ -12,17 +12,25 @@ exports.getAllCourses = async (req, res) => {
         c.category,
         c.university_count,
         c.student_count,
+        c.application_deadline,
+        c.start_date,
+        c.end_date,
         c.created_at,
-        u.first_name || ' ' || u.last_name as academician_name
+        u.first_name || ' ' || u.last_name as academician_name,
+        CASE 
+          WHEN c.application_deadline >= CURRENT_DATE THEN true
+          ELSE false
+        END as is_active
       FROM courses c
       LEFT JOIN academicians a ON c.academician_id = a.id
       LEFT JOIN users u ON a.user_id = u.id
+      WHERE c.application_deadline IS NULL OR c.application_deadline >= CURRENT_DATE
       ORDER BY c.created_at DESC
     `;
 
     res.json({
       success: true,
-      data: courses,
+      courses: courses,
     });
   } catch (error) {
     console.error("Ders listeleme hatası:", error);
@@ -60,7 +68,14 @@ exports.getMyCourses = async (req, res) => {
         category,
         university_count,
         student_count,
-        created_at
+        application_deadline,
+        start_date,
+        end_date,
+        created_at,
+        CASE 
+          WHEN application_deadline >= CURRENT_DATE THEN true
+          ELSE false
+        END as is_active
       FROM courses
       WHERE academician_id = ${academician[0].id}
         AND (university_id = ${academician[0].university_id} OR university_id IS NULL)
@@ -69,7 +84,7 @@ exports.getMyCourses = async (req, res) => {
 
     res.json({
       success: true,
-      data: courses,
+      courses: courses,
     });
   } catch (error) {
     console.error("Ders listeleme hatası:", error);
@@ -85,7 +100,7 @@ exports.createCourse = async (req, res) => {
   try {
     const userId = req.user.id;
     const userType = req.user.userType;
-    const { courseName, courseCode, description, category, academicianId } = req.body;
+    const { courseName, courseCode, description, category, academicianId, applicationDeadline, startDate, endDate } = req.body;
 
     if (!courseName || courseName.trim() === '') {
       return res.status(400).json({
@@ -138,8 +153,8 @@ exports.createCourse = async (req, res) => {
 
     // Ders oluştur
     const newCourse = await sql`
-      INSERT INTO courses (academician_id, course_name, course_code, description, category, university_id)
-      VALUES (${finalAcademicianId}, ${courseName}, ${courseCode || null}, ${description || null}, ${category || null}, ${finalUniversityId})
+      INSERT INTO courses (academician_id, course_name, course_code, description, category, university_id, application_deadline, start_date, end_date)
+      VALUES (${finalAcademicianId}, ${courseName}, ${courseCode || null}, ${description || null}, ${category || null}, ${finalUniversityId}, ${applicationDeadline || null}, ${startDate || null}, ${endDate || null})
       RETURNING *
     `;
 

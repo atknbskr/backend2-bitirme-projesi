@@ -466,4 +466,90 @@ exports.deleteUniversity = async (req, res) => {
   }
 };
 
+// Akademisyene üniversite ata
+exports.assignUniversityToAcademician = async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    const { universityId } = req.body;
+
+    // Kullanıcının akademisyen olup olmadığını kontrol et
+    const academician = await sql`
+      SELECT id FROM academicians WHERE user_id = ${userId}
+    `;
+
+    if (academician.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Akademisyen bulunamadı",
+      });
+    }
+
+    // Üniversite var mı kontrol et
+    if (universityId) {
+      const university = await sql`
+        SELECT id FROM universities WHERE id = ${universityId}
+      `;
+      if (university.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Üniversite bulunamadı",
+        });
+      }
+    }
+
+    // Üniversiteyi ata (null ise kaldır)
+    await sql`
+      UPDATE academicians 
+      SET university_id = ${universityId || null}
+      WHERE user_id = ${userId}
+    `;
+
+    res.json({
+      success: true,
+      message: universityId 
+        ? "Üniversite başarıyla atandı" 
+        : "Üniversite ataması kaldırıldı",
+    });
+  } catch (error) {
+    console.error("Üniversite atama hatası:", error);
+    res.status(500).json({
+      success: false,
+      message: "Üniversite atanırken bir hata oluştu",
+    });
+  }
+};
+
+// Akademisyenleri üniversite bilgileriyle listele
+exports.getAcademicians = async (req, res) => {
+  try {
+    const academicians = await sql`
+      SELECT 
+        u.id as user_id,
+        u.first_name,
+        u.last_name,
+        u.email,
+        a.username,
+        a.university_id,
+        uni.name as university_name,
+        u.created_at
+      FROM users u
+      JOIN academicians a ON u.id = a.user_id
+      LEFT JOIN universities uni ON a.university_id = uni.id
+      WHERE u.user_type = 'academician'
+      ORDER BY u.created_at DESC
+    `;
+
+    res.json({
+      success: true,
+      academicians,
+    });
+  } catch (error) {
+    console.error("Akademisyen listeleme hatası:", error);
+    res.status(500).json({
+      success: false,
+      message: "Akademisyenler alınırken bir hata oluştu",
+    });
+  }
+};
+
 

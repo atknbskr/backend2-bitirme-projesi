@@ -8,6 +8,7 @@ const courseRoutes = require("./routes/courses");
 const favoriteRoutes = require("./routes/favorites");
 const adminRoutes = require("./routes/admin");
 const universityRoutes = require("./routes/universities");
+const facultyRoutes = require("./routes/faculties");
 
 const app = express();
 const PORT = process.env.PORT || 5500;
@@ -35,6 +36,7 @@ app.use("/api/courses", courseRoutes);
 app.use("/api/favorites", favoriteRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/universities", universityRoutes);
+app.use("/api/faculties", facultyRoutes);
 
 // Health check
 app.get("/api/health", (req, res) => {

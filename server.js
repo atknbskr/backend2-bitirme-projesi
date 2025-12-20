@@ -72,6 +72,8 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server http://localhost:${PORT} adresinde çalışıyor`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Server http://0.0.0.0:${PORT} adresinde çalışıyor`);
+  console.log(`📱 Android emülatör için: http://10.0.2.2:${PORT}`);
+  console.log(`💻 Localhost için: http://localhost:${PORT}`);
 });

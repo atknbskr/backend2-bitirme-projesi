@@ -158,6 +158,68 @@ exports.createCourse = async (req, res) => {
   }
 };
 
+// Derse kayıtlı öğrencileri getir
+exports.getCourseStudents = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const courseId = req.params.id;
+
+    // Akademisyen ID'sini bul
+    const academician = await sql`
+      SELECT id FROM academicians WHERE user_id = ${userId}
+    `;
+
+    if (academician.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: "Bu işlem için akademisyen yetkisi gereklidir",
+      });
+    }
+
+    // Dersin akademisyene ait olup olmadığını kontrol et
+    const course = await sql`
+      SELECT id, course_name FROM courses 
+      WHERE id = ${courseId} AND academician_id = ${academician[0].id}
+    `;
+
+    if (course.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Ders bulunamadı veya erişim yetkiniz yok",
+      });
+    }
+
+    // Derse kayıtlı öğrencileri getir
+    const students = await sql`
+      SELECT 
+        u.id,
+        u.first_name,
+        u.last_name,
+        u.email,
+        s.student_number,
+        f.created_at as enrolled_at
+      FROM favorites f
+      JOIN students s ON f.student_id = s.id
+      JOIN users u ON s.user_id = u.id
+      WHERE f.course_id = ${courseId}
+      ORDER BY f.created_at DESC
+    `;
+
+    res.json({
+      success: true,
+      course: course[0],
+      students,
+      totalStudents: students.length,
+    });
+  } catch (error) {
+    console.error("Öğrenci listeleme hatası:", error);
+    res.status(500).json({
+      success: false,
+      message: "Öğrenciler alınırken bir hata oluştu",
+    });
+  }
+};
+
 // Ders sil
 exports.deleteCourse = async (req, res) => {
   try {

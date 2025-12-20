@@ -74,4 +74,16 @@ router.post(
 // Kullanıcı Bilgileri (Korumalı)
 router.get("/me", authMiddleware, authController.getMe);
 
+// Profil Güncelleme (Korumalı)
+router.put(
+  "/profile/update",
+  authMiddleware,
+  [
+    body("firstName").notEmpty().withMessage("Ad gerekli"),
+    body("lastName").notEmpty().withMessage("Soyad gerekli"),
+  ],
+  validate,
+  authController.updateProfile
+);
+
 module.exports = router;

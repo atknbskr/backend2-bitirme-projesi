@@ -326,14 +326,35 @@ exports.updateUser = async (req, res) => {
 // Tüm üniversiteleri listele
 exports.getAllUniversities = async (req, res) => {
   try {
-    const universities = await sql`
-      SELECT * FROM universities
-      ORDER BY name ASC
+    const { city, type } = req.query;
+
+    let universities;
+    if (city || type) {
+      universities = await sql`
+        SELECT * FROM universities
+        WHERE 1=1
+          ${city ? sql`AND city = ${city}` : sql``}
+          ${type ? sql`AND type = ${type}` : sql``}
+        ORDER BY name ASC
+      `;
+    } else {
+      universities = await sql`
+        SELECT * FROM universities
+        ORDER BY name ASC
+      `;
+    }
+
+    // Şehirleri tekil olarak al (filtreleme için)
+    const cities = await sql`
+      SELECT DISTINCT city FROM universities
+      WHERE city IS NOT NULL
+      ORDER BY city ASC
     `;
 
     res.json({
       success: true,
       universities,
+      cities: cities.map(c => c.city),
     });
   } catch (error) {
     console.error("Üniversite listeleme hatası:", error);

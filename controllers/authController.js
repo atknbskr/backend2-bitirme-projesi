@@ -293,6 +293,61 @@ exports.getMe = async (req, res) => {
       });
     }
 
+    // Akademisyen ise ek bilgileri getir
+    if (user[0].user_type === "academician") {
+      const academician = await sql`
+        SELECT a.username, a.university_id, a.title, a.office, a.office_hours, 
+               a.department, uni.name as university_name
+        FROM academicians a
+        LEFT JOIN universities uni ON a.university_id = uni.id
+        WHERE a.user_id = ${user[0].id}
+      `;
+
+      return res.json({
+        success: true,
+        user: {
+          id: user[0].id,
+          email: user[0].email,
+          firstName: user[0].first_name,
+          lastName: user[0].last_name,
+          userType: user[0].user_type,
+          username: academician[0]?.username,
+          universityId: academician[0]?.university_id,
+          universityName: academician[0]?.university_name,
+          title: academician[0]?.title,
+          office: academician[0]?.office,
+          officeHours: academician[0]?.office_hours,
+          department: academician[0]?.department,
+          createdAt: user[0].created_at,
+        },
+      });
+    }
+
+    // Öğrenci ise ek bilgileri getir
+    if (user[0].user_type === "student") {
+      const student = await sql`
+        SELECT s.student_number, s.university, s.department, s.faculty
+        FROM students s
+        WHERE s.user_id = ${user[0].id}
+      `;
+
+      return res.json({
+        success: true,
+        user: {
+          id: user[0].id,
+          email: user[0].email,
+          firstName: user[0].first_name,
+          lastName: user[0].last_name,
+          userType: user[0].user_type,
+          studentNumber: student[0]?.student_number,
+          university: student[0]?.university,
+          department: student[0]?.department,
+          faculty: student[0]?.faculty,
+          createdAt: user[0].created_at,
+        },
+      });
+    }
+
     res.json({
       success: true,
       user: {
@@ -309,6 +364,95 @@ exports.getMe = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Kullanıcı bilgileri alınırken hata oluştu",
+    });
+  }
+};
+
+// Profil Güncelleme
+exports.updateProfile = async (req, res) => {
+  try {
+    const { firstName, lastName, title, office, officeHours, department } =
+      req.body;
+    const userId = req.user.id;
+
+    // Kullanıcı bilgilerini güncelle
+    await sql`
+      UPDATE users
+      SET first_name = ${firstName}, last_name = ${lastName}
+      WHERE id = ${userId}
+    `;
+
+    // Akademisyen ise ek bilgileri güncelle
+    if (req.user.userType === "academician") {
+      await sql`
+        UPDATE academicians
+        SET title = ${title || null}, 
+            office = ${office || null}, 
+            office_hours = ${officeHours || null},
+            department = ${department || null}
+        WHERE user_id = ${userId}
+      `;
+
+      // Güncellenmiş kullanıcı bilgilerini getir
+      const updatedUser = await sql`
+        SELECT u.id, u.email, u.first_name, u.last_name, u.user_type,
+               a.username, a.university_id, a.title, a.office, a.office_hours, 
+               a.department, uni.name as university_name
+        FROM users u
+        JOIN academicians a ON u.id = a.user_id
+        LEFT JOIN universities uni ON a.university_id = uni.id
+        WHERE u.id = ${userId}
+      `;
+
+      return res.json({
+        success: true,
+        message: "Profil başarıyla güncellendi",
+        user: {
+          id: updatedUser[0].id,
+          email: updatedUser[0].email,
+          firstName: updatedUser[0].first_name,
+          lastName: updatedUser[0].last_name,
+          userType: updatedUser[0].user_type,
+          username: updatedUser[0].username,
+          universityId: updatedUser[0].university_id,
+          universityName: updatedUser[0].university_name,
+          title: updatedUser[0].title,
+          office: updatedUser[0].office,
+          officeHours: updatedUser[0].office_hours,
+          department: updatedUser[0].department,
+        },
+      });
+    }
+
+    // Öğrenci ise
+    const updatedUser = await sql`
+      SELECT u.id, u.email, u.first_name, u.last_name, u.user_type,
+             s.student_number, s.university, s.department, s.faculty
+      FROM users u
+      LEFT JOIN students s ON u.id = s.user_id
+      WHERE u.id = ${userId}
+    `;
+
+    res.json({
+      success: true,
+      message: "Profil başarıyla güncellendi",
+      user: {
+        id: updatedUser[0].id,
+        email: updatedUser[0].email,
+        firstName: updatedUser[0].first_name,
+        lastName: updatedUser[0].last_name,
+        userType: updatedUser[0].user_type,
+        studentNumber: updatedUser[0].student_number,
+        university: updatedUser[0].university,
+        department: updatedUser[0].department,
+        faculty: updatedUser[0].faculty,
+      },
+    });
+  } catch (error) {
+    console.error("Profil güncelleme hatası:", error);
+    res.status(500).json({
+      success: false,
+      message: "Profil güncellenirken hata oluştu",
     });
   }
 };

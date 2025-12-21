@@ -20,6 +20,9 @@ const validate = (req, res, next) => {
 // Tüm dersleri listele (herkese açık)
 router.get("/", courseController.getAllCourses);
 
+// Ders detaylarını getir (herkese açık)
+router.get("/:id/details", courseController.getCourseDetails);
+
 // Akademisyenin kendi derslerini listele
 router.get("/my-courses", authMiddleware, courseController.getMyCourses);
 

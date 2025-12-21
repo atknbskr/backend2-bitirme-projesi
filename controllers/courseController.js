@@ -315,6 +315,92 @@ exports.getMyCoursesWithStudents = async (req, res) => {
   }
 };
 
+// Ders detaylarını getir (akademisyen bilgileri ile)
+exports.getCourseDetails = async (req, res) => {
+  try {
+    const courseId = req.params.id;
+
+    // Ders bilgilerini akademisyen detayları ile getir
+    const course = await sql`
+      SELECT 
+        c.id,
+        c.course_name,
+        c.course_code,
+        c.description,
+        c.category,
+        c.credits,
+        c.price,
+        c.course_hours,
+        c.quota,
+        c.requirements,
+        c.equivalency_info,
+        c.university_count,
+        c.student_count,
+        c.application_deadline,
+        c.start_date,
+        c.end_date,
+        c.created_at,
+        a.id as academician_id,
+        a.username as academician_username,
+        a.title as academician_title,
+        a.office as academician_office,
+        a.office_hours as academician_office_hours,
+        a.department as academician_department,
+        u.first_name as academician_first_name,
+        u.last_name as academician_last_name,
+        u.email as academician_email
+      FROM courses c
+      LEFT JOIN academicians a ON c.academician_id = a.id
+      LEFT JOIN users u ON a.user_id = u.id
+      WHERE c.id = ${courseId}
+    `;
+
+    if (course.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Ders bulunamadı",
+      });
+    }
+
+    // Akademisyen bilgilerini düzenle
+    const courseData = {
+      ...course[0],
+      academician: course[0].academician_id ? {
+        id: course[0].academician_id,
+        username: course[0].academician_username,
+        title: course[0].academician_title,
+        full_name: `${course[0].academician_first_name || ''} ${course[0].academician_last_name || ''}`.trim(),
+        email: course[0].academician_email,
+        office: course[0].academician_office,
+        office_hours: course[0].academician_office_hours,
+        department: course[0].academician_department,
+      } : null
+    };
+
+    // Akademisyen alanlarını temizle
+    delete courseData.academician_id;
+    delete courseData.academician_username;
+    delete courseData.academician_title;
+    delete courseData.academician_first_name;
+    delete courseData.academician_last_name;
+    delete courseData.academician_email;
+    delete courseData.academician_office;
+    delete courseData.academician_office_hours;
+    delete courseData.academician_department;
+
+    res.json({
+      success: true,
+      course: courseData,
+    });
+  } catch (error) {
+    console.error("Ders detay hatası:", error);
+    res.status(500).json({
+      success: false,
+      message: "Ders detayları alınırken bir hata oluştu",
+    });
+  }
+};
+
 // Ders sil
 exports.deleteCourse = async (req, res) => {
   try {

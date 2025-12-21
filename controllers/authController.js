@@ -296,8 +296,7 @@ exports.getMe = async (req, res) => {
     // Akademisyen ise ek bilgileri getir
     if (user[0].user_type === "academician") {
       const academician = await sql`
-        SELECT a.username, a.university_id, a.title, a.office, a.office_hours, 
-               a.department, uni.name as university_name
+        SELECT a.username, a.university_id, uni.name as university_name
         FROM academicians a
         LEFT JOIN universities uni ON a.university_id = uni.id
         WHERE a.user_id = ${user[0].id}
@@ -314,10 +313,6 @@ exports.getMe = async (req, res) => {
           username: academician[0]?.username,
           universityId: academician[0]?.university_id,
           universityName: academician[0]?.university_name,
-          title: academician[0]?.title,
-          office: academician[0]?.office,
-          officeHours: academician[0]?.office_hours,
-          department: academician[0]?.department,
           createdAt: user[0].created_at,
         },
       });
@@ -326,7 +321,7 @@ exports.getMe = async (req, res) => {
     // Öğrenci ise ek bilgileri getir
     if (user[0].user_type === "student") {
       const student = await sql`
-        SELECT s.student_number, s.university, s.department, s.faculty
+        SELECT s.student_number
         FROM students s
         WHERE s.user_id = ${user[0].id}
       `;
@@ -340,9 +335,6 @@ exports.getMe = async (req, res) => {
           lastName: user[0].last_name,
           userType: user[0].user_type,
           studentNumber: student[0]?.student_number,
-          university: student[0]?.university,
-          department: student[0]?.department,
-          faculty: student[0]?.faculty,
           createdAt: user[0].created_at,
         },
       });
@@ -375,10 +367,6 @@ exports.updateProfile = async (req, res) => {
       firstName, 
       lastName, 
       email,
-      title, 
-      office, 
-      phone,
-      department,
       currentPassword,
       newPassword
     } = req.body;
@@ -435,20 +423,14 @@ exports.updateProfile = async (req, res) => {
 
     // Akademisyen ise ek bilgileri güncelle
     if (req.user.userType === "academician") {
-      await sql`
-        UPDATE academicians
-        SET title = ${title || null}, 
-            office = ${office || null}, 
-            phone = ${phone || null},
-            department = ${department || null}
-        WHERE user_id = ${userId}
-      `;
+      // Akademisyenler için sadece var olan kolonları güncelle
+      // title, office, department gibi alanlar academicians tablosunda yoksa kaldırılabilir
+      // Şimdilik sadece temel kullanıcı bilgileri güncellenecek
 
       // Güncellenmiş kullanıcı bilgilerini getir
       const updatedUser = await sql`
         SELECT u.id, u.email, u.first_name, u.last_name, u.user_type,
-               a.username, a.university_id, a.title, a.office, a.phone, 
-               a.department, uni.name as university_name
+               a.username, a.university_id, uni.name as university_name
         FROM users u
         JOIN academicians a ON u.id = a.user_id
         LEFT JOIN universities uni ON a.university_id = uni.id
@@ -467,10 +449,6 @@ exports.updateProfile = async (req, res) => {
           username: updatedUser[0].username,
           universityId: updatedUser[0].university_id,
           universityName: updatedUser[0].university_name,
-          title: updatedUser[0].title,
-          office: updatedUser[0].office,
-          phone: updatedUser[0].phone,
-          department: updatedUser[0].department,
         },
       });
     }
@@ -478,7 +456,7 @@ exports.updateProfile = async (req, res) => {
     // Öğrenci ise
     const updatedUser = await sql`
       SELECT u.id, u.email, u.first_name, u.last_name, u.user_type,
-             s.student_number, s.university, s.department, s.faculty
+             s.student_number
       FROM users u
       LEFT JOIN students s ON u.id = s.user_id
       WHERE u.id = ${userId}
@@ -494,9 +472,6 @@ exports.updateProfile = async (req, res) => {
         lastName: updatedUser[0].last_name,
         userType: updatedUser[0].user_type,
         studentNumber: updatedUser[0].student_number,
-        university: updatedUser[0].university,
-        department: updatedUser[0].department,
-        faculty: updatedUser[0].faculty,
       },
     });
   } catch (error) {

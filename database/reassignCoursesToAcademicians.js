@@ -107,3 +107,4 @@ async function reassignCourses() {
 
 reassignCourses();
 
+

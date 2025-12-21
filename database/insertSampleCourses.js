@@ -157,3 +157,4 @@ async function insertSampleCourses() {
 insertSampleCourses();
 
 
+

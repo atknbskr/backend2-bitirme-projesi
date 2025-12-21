@@ -371,14 +371,65 @@ exports.getMe = async (req, res) => {
 // Profil Güncelleme
 exports.updateProfile = async (req, res) => {
   try {
-    const { firstName, lastName, title, office, officeHours, department } =
-      req.body;
+    const { 
+      firstName, 
+      lastName, 
+      email,
+      title, 
+      office, 
+      phone,
+      department,
+      currentPassword,
+      newPassword
+    } = req.body;
     const userId = req.user.id;
+
+    // Email güncellemesi varsa, başka kullanıcı kullanıyor mu kontrol et
+    if (email && email !== req.user.email) {
+      const existingUser = await sql`
+        SELECT id FROM users WHERE email = ${email} AND id != ${userId}
+      `;
+      if (existingUser.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Bu e-posta adresi başka bir kullanıcı tarafından kullanılıyor",
+        });
+      }
+    }
+
+    // Şifre değiştirme kontrolü
+    if (currentPassword && newPassword) {
+      // Mevcut şifreyi doğrula
+      const user = await sql`
+        SELECT password_hash FROM users WHERE id = ${userId}
+      `;
+      
+      const isMatch = await bcrypt.compare(currentPassword, user[0].password_hash);
+      if (!isMatch) {
+        return res.status(401).json({
+          success: false,
+          message: "Mevcut şifreniz hatalı",
+        });
+      }
+
+      // Yeni şifreyi hashle
+      const salt = await bcrypt.genSalt(10);
+      const newPasswordHash = await bcrypt.hash(newPassword, salt);
+
+      // Şifreyi güncelle
+      await sql`
+        UPDATE users
+        SET password_hash = ${newPasswordHash}
+        WHERE id = ${userId}
+      `;
+    }
 
     // Kullanıcı bilgilerini güncelle
     await sql`
       UPDATE users
-      SET first_name = ${firstName}, last_name = ${lastName}
+      SET first_name = ${firstName}, 
+          last_name = ${lastName},
+          email = ${email || req.user.email}
       WHERE id = ${userId}
     `;
 
@@ -388,7 +439,7 @@ exports.updateProfile = async (req, res) => {
         UPDATE academicians
         SET title = ${title || null}, 
             office = ${office || null}, 
-            office_hours = ${officeHours || null},
+            phone = ${phone || null},
             department = ${department || null}
         WHERE user_id = ${userId}
       `;
@@ -396,7 +447,7 @@ exports.updateProfile = async (req, res) => {
       // Güncellenmiş kullanıcı bilgilerini getir
       const updatedUser = await sql`
         SELECT u.id, u.email, u.first_name, u.last_name, u.user_type,
-               a.username, a.university_id, a.title, a.office, a.office_hours, 
+               a.username, a.university_id, a.title, a.office, a.phone, 
                a.department, uni.name as university_name
         FROM users u
         JOIN academicians a ON u.id = a.user_id
@@ -418,7 +469,7 @@ exports.updateProfile = async (req, res) => {
           universityName: updatedUser[0].university_name,
           title: updatedUser[0].title,
           office: updatedUser[0].office,
-          officeHours: updatedUser[0].office_hours,
+          phone: updatedUser[0].phone,
           department: updatedUser[0].department,
         },
       });

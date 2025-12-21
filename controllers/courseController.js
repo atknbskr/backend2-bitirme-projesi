@@ -235,6 +235,86 @@ exports.getCourseStudents = async (req, res) => {
   }
 };
 
+// Akademisyenin derslerini öğrencilerle birlikte listele
+exports.getMyCoursesWithStudents = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Akademisyen ID'sini bul
+    const academician = await sql`
+      SELECT id, university_id FROM academicians WHERE user_id = ${userId}
+    `;
+
+    if (academician.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: "Bu işlem için akademisyen yetkisi gereklidir",
+      });
+    }
+
+    // Akademisyenin derslerini getir
+    const courses = await sql`
+      SELECT 
+        c.id,
+        c.course_name,
+        c.course_code,
+        c.description,
+        c.category,
+        c.university_count,
+        c.student_count,
+        c.application_deadline,
+        c.start_date,
+        c.end_date,
+        c.created_at,
+        CASE 
+          WHEN c.application_deadline >= CURRENT_DATE THEN true
+          ELSE false
+        END as is_active
+      FROM courses c
+      WHERE c.academician_id = ${academician[0].id}
+        AND (c.university_id = ${academician[0].university_id} OR c.university_id IS NULL)
+      ORDER BY c.created_at DESC
+    `;
+
+    // Her ders için öğrencileri getir
+    const coursesWithStudents = await Promise.all(
+      courses.map(async (course) => {
+        const students = await sql`
+          SELECT 
+            u.id,
+            u.first_name,
+            u.last_name,
+            u.email,
+            s.student_number,
+            f.created_at as enrolled_at
+          FROM favorites f
+          JOIN students s ON f.student_id = s.id
+          JOIN users u ON s.user_id = u.id
+          WHERE f.course_id = ${course.id}
+          ORDER BY f.created_at DESC
+        `;
+
+        return {
+          ...course,
+          students: students,
+          student_count: students.length,
+        };
+      })
+    );
+
+    res.json({
+      success: true,
+      courses: coursesWithStudents,
+    });
+  } catch (error) {
+    console.error("Ders listeleme hatası:", error);
+    res.status(500).json({
+      success: false,
+      message: "Dersler alınırken bir hata oluştu",
+    });
+  }
+};
+
 // Ders sil
 exports.deleteCourse = async (req, res) => {
   try {

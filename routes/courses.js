@@ -23,6 +23,9 @@ router.get("/", courseController.getAllCourses);
 // Akademisyenin kendi derslerini listele
 router.get("/my-courses", authMiddleware, courseController.getMyCourses);
 
+// Akademisyenin derslerini öğrencilerle birlikte listele
+router.get("/my-courses-with-students", authMiddleware, courseController.getMyCoursesWithStudents);
+
 // Derse kayıtlı öğrencileri getir (sadece akademisyen - kendi dersleri)
 router.get("/:id/students", authMiddleware, courseController.getCourseStudents);
 

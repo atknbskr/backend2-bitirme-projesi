@@ -331,16 +331,50 @@ exports.getAllUniversities = async (req, res) => {
     let universities;
     if (city || type) {
       universities = await sql`
-        SELECT * FROM universities
+        SELECT 
+          u.*,
+          COUNT(DISTINCT a.id) as academician_count,
+          COUNT(DISTINCT student_courses.student_id) as student_count
+        FROM universities u
+        LEFT JOIN academicians a ON u.id = a.university_id
+          LEFT JOIN (
+          -- Öğrenciler hangi üniversitenin dersini seçmişse o üniversiteye aittir
+          SELECT DISTINCT 
+            s.id as student_id,
+            acad.university_id
+          FROM students s
+          LEFT JOIN favorites f ON s.id = f.student_id
+          LEFT JOIN courses c ON f.course_id = c.id
+          LEFT JOIN academicians acad ON c.academician_id = acad.id
+          WHERE acad.university_id IS NOT NULL
+        ) student_courses ON student_courses.university_id = u.id
         WHERE 1=1
-          ${city ? sql`AND city = ${city}` : sql``}
-          ${type ? sql`AND type = ${type}` : sql``}
-        ORDER BY name ASC
+          ${city ? sql`AND u.city = ${city}` : sql``}
+          ${type ? sql`AND u.type = ${type}` : sql``}
+        GROUP BY u.id
+        ORDER BY u.name ASC
       `;
     } else {
       universities = await sql`
-        SELECT * FROM universities
-        ORDER BY name ASC
+        SELECT 
+          u.*,
+          COUNT(DISTINCT a.id) as academician_count,
+          COUNT(DISTINCT student_courses.student_id) as student_count
+        FROM universities u
+        LEFT JOIN academicians a ON u.id = a.university_id
+          LEFT JOIN (
+          -- Öğrenciler hangi üniversitenin dersini seçmişse o üniversiteye aittir
+          SELECT DISTINCT 
+            s.id as student_id,
+            acad.university_id
+          FROM students s
+          LEFT JOIN favorites f ON s.id = f.student_id
+          LEFT JOIN courses c ON f.course_id = c.id
+          LEFT JOIN academicians acad ON c.academician_id = acad.id
+          WHERE acad.university_id IS NOT NULL
+        ) student_courses ON student_courses.university_id = u.id
+        GROUP BY u.id
+        ORDER BY u.name ASC
       `;
     }
 
@@ -353,7 +387,11 @@ exports.getAllUniversities = async (req, res) => {
 
     res.json({
       success: true,
-      universities,
+      universities: universities.map(u => ({
+        ...u,
+        academician_count: parseInt(u.academician_count) || 0,
+        student_count: parseInt(u.student_count) || 0
+      })),
       cities: cities.map(c => c.city),
     });
   } catch (error) {

@@ -426,9 +426,12 @@ exports.addUniversity = async (req, res) => {
       });
     }
 
+    // Type'ı normalize et (küçük harf ve Türkçe karakterlerle)
+    const normalizedType = (type || 'devlet').toLowerCase();
+
     const newUniversity = await sql`
       INSERT INTO universities (name, city, type, website, description, logo_url, email, phone)
-      VALUES (${name}, ${city || null}, ${type || 'devlet'}, ${website || null}, ${description || null}, 
+      VALUES (${name}, ${city || null}, ${normalizedType}, ${website || null}, ${description || null}, 
               ${logoUrl || null}, ${contactEmail || null}, ${contactPhone || null})
       RETURNING *
     `;
@@ -477,12 +480,15 @@ exports.updateUniversity = async (req, res) => {
       }
     }
 
+    // Type'ı normalize et (küçük harf ve Türkçe karakterlerle)
+    const normalizedType = type ? type.toLowerCase() : null;
+
     await sql`
       UPDATE universities 
       SET 
         name = COALESCE(${name}, name),
         city = COALESCE(${city}, city),
-        type = COALESCE(${type}, type),
+        type = COALESCE(${normalizedType}, type),
         website = COALESCE(${website}, website),
         description = COALESCE(${description}, description),
         logo_url = COALESCE(${logoUrl}, logo_url),

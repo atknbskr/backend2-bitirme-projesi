@@ -16,3 +16,4 @@ CREATE INDEX IF NOT EXISTS idx_faculties_academician_id ON faculties(academician
 -- Tabloların oluşturulduğunu kontrol et
 SELECT 'Fakülteler tablosu başarıyla oluşturuldu!' as mesaj;
 
+

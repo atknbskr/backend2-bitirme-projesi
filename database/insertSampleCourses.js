@@ -156,3 +156,4 @@ async function insertSampleCourses() {
 // Script'i çalıştır
 insertSampleCourses();
 
+

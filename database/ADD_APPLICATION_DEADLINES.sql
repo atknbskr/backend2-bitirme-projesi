@@ -43,3 +43,4 @@ LIMIT 10;
 -- Başarı mesajı
 SELECT 'Başvuru tarihleri başarıyla güncellendi! ✅' as mesaj;
 
+

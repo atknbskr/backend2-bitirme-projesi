@@ -42,3 +42,4 @@ router.delete("/:id", academicianOrAdminAuth, facultyController.deleteFaculty);
 
 module.exports = router;
 
+

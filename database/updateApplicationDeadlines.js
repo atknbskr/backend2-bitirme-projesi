@@ -88,3 +88,4 @@ async function updateApplicationDeadlines() {
 // Script'i çalıştır
 updateApplicationDeadlines();
 
+

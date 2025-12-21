@@ -44,6 +44,9 @@ router.post(
   courseController.createCourse
 );
 
+// Ders güncelle (sadece akademisyen - kendi dersleri veya admin)
+router.put("/:id", authMiddleware, courseController.updateCourse);
+
 // Ders sil (sadece akademisyen - kendi dersleri)
 router.delete("/:id", authMiddleware, courseController.deleteCourse);
 

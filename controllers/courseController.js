@@ -10,6 +10,7 @@ exports.getAllCourses = async (req, res) => {
         c.course_code,
         c.description,
         c.category,
+        c.academician_id,
         c.university_count,
         c.student_count,
         c.application_deadline,
@@ -397,6 +398,99 @@ exports.getCourseDetails = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Ders detayları alınırken bir hata oluştu",
+    });
+  }
+};
+
+// Ders güncelle
+exports.updateCourse = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const userType = req.user.userType;
+    const courseId = req.params.id;
+    const { courseName, courseCode, description, category, academicianId, applicationDeadline, startDate, endDate } = req.body;
+
+    // Ders var mı kontrol et
+    const existingCourse = await sql`SELECT * FROM courses WHERE id = ${courseId}`;
+    if (existingCourse.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Ders bulunamadı",
+      });
+    }
+
+    let finalAcademicianId = existingCourse[0].academician_id;
+    let finalUniversityId = existingCourse[0].university_id;
+
+    // Admin ise, tüm dersleri güncelleyebilir
+    if (userType === 'admin') {
+      // Akademisyen ID değiştiriliyorsa kontrol et
+      if (academicianId !== undefined) {
+        if (academicianId === null || academicianId === '') {
+          finalAcademicianId = null;
+          finalUniversityId = null;
+        } else {
+          const academician = await sql`SELECT id, university_id FROM academicians WHERE id = ${academicianId}`;
+          if (academician.length === 0) {
+            return res.status(400).json({
+              success: false,
+              message: "Geçersiz akademisyen ID",
+            });
+          }
+          finalAcademicianId = academicianId;
+          finalUniversityId = academician[0].university_id;
+        }
+      }
+    } else {
+      // Akademisyen ise, sadece kendi dersini güncelleyebilir
+      const academician = await sql`
+        SELECT id, university_id FROM academicians WHERE user_id = ${userId}
+      `;
+
+      if (academician.length === 0) {
+        return res.status(403).json({
+          success: false,
+          message: "Bu işlem için akademisyen yetkisi gereklidir",
+        });
+      }
+
+      // Dersin sahibi kontrolü
+      if (existingCourse[0].academician_id !== academician[0].id) {
+        return res.status(403).json({
+          success: false,
+          message: "Bu dersi güncelleme yetkiniz yok",
+        });
+      }
+
+      finalAcademicianId = academician[0].id;
+      finalUniversityId = academician[0].university_id;
+    }
+
+    // Dersi güncelle
+    await sql`
+      UPDATE courses 
+      SET 
+        course_name = COALESCE(${courseName}, course_name),
+        course_code = COALESCE(${courseCode}, course_code),
+        description = COALESCE(${description}, description),
+        category = COALESCE(${category}, category),
+        academician_id = ${finalAcademicianId},
+        university_id = ${finalUniversityId},
+        application_deadline = COALESCE(${applicationDeadline}, application_deadline),
+        start_date = COALESCE(${startDate}, start_date),
+        end_date = COALESCE(${endDate}, end_date)
+      WHERE id = ${courseId}
+    `;
+
+    res.json({
+      success: true,
+      message: "Ders başarıyla güncellendi",
+    });
+  } catch (error) {
+    console.error("Ders güncelleme hatası:", error);
+    res.status(500).json({
+      success: false,
+      message: "Ders güncellenirken bir hata oluştu",
     });
   }
 };

@@ -36,14 +36,11 @@ exports.getMyRegistrations = async (req, res) => {
         so.current_registrations,
         u.name as university_name,
         u.city as university_city,
-        f.name as faculty_name,
-        sfc.course_name as failed_course_name,
-        sfc.course_code as failed_course_code
+        f.name as faculty_name
       FROM summer_school_registrations sr
       LEFT JOIN summer_school_offerings so ON sr.offering_id = so.id
       LEFT JOIN universities u ON so.university_id = u.id
       LEFT JOIN faculties f ON so.faculty_id = f.id
-      LEFT JOIN student_failed_courses sfc ON sr.failed_course_id = sfc.id
       WHERE sr.student_id = ${student[0].id}
       ORDER BY sr.application_date DESC
     `;
@@ -65,7 +62,7 @@ exports.getMyRegistrations = async (req, res) => {
 exports.createRegistration = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { offeringId, failedCourseId, applicationNote } = req.body;
+    const { offeringId, applicationNote } = req.body;
 
     if (!offeringId) {
       return res.status(400).json({
@@ -150,14 +147,12 @@ exports.createRegistration = async (req, res) => {
       INSERT INTO summer_school_registrations (
         student_id,
         offering_id,
-        failed_course_id,
         application_note,
         status
       )
       VALUES (
         ${student[0].id},
         ${offeringId},
-        ${failedCourseId || null},
         ${applicationNote || null},
         'pending'
       )
@@ -293,13 +288,10 @@ exports.getOfferingRegistrations = async (req, res) => {
         u.first_name,
         u.last_name,
         u.email,
-        s.student_number,
-        sfc.course_name as failed_course_name,
-        sfc.course_code as failed_course_code
+        s.student_number
       FROM summer_school_registrations sr
       JOIN students s ON sr.student_id = s.id
       JOIN users u ON s.user_id = u.id
-      LEFT JOIN student_failed_courses sfc ON sr.failed_course_id = sfc.id
       WHERE sr.offering_id = ${offeringId}
       ORDER BY sr.application_date DESC
     `;
@@ -392,4 +384,5 @@ exports.updateRegistrationStatus = async (req, res) => {
     });
   }
 };
+
 

@@ -1,19 +1,7 @@
 -- Yaz Okulu Sistemi Tabloları
 -- Bu SQL'i Neon Dashboard > SQL Editor'de çalıştırın
 
--- 1. Öğrencilerin Başarısız Oldukları Dersler
-CREATE TABLE IF NOT EXISTS student_failed_courses (
-    id SERIAL PRIMARY KEY,
-    student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
-    course_name VARCHAR(255) NOT NULL,
-    course_code VARCHAR(50),
-    semester VARCHAR(50),
-    academic_year VARCHAR(20),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(student_id, course_code, academic_year)
-);
-
--- 2. Yaz Okulu Teklifleri
+-- 1. Yaz Okulu Teklifleri
 CREATE TABLE IF NOT EXISTS summer_school_offerings (
     id SERIAL PRIMARY KEY,
     course_id INTEGER REFERENCES courses(id) ON DELETE SET NULL,
@@ -54,12 +42,11 @@ CREATE TABLE IF NOT EXISTS summer_school_offerings (
     CHECK (current_registrations <= quota)
 );
 
--- 3. Yaz Okulu Başvuruları
+-- 2. Yaz Okulu Başvuruları
 CREATE TABLE IF NOT EXISTS summer_school_registrations (
     id SERIAL PRIMARY KEY,
     student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
     offering_id INTEGER NOT NULL REFERENCES summer_school_offerings(id) ON DELETE CASCADE,
-    failed_course_id INTEGER REFERENCES student_failed_courses(id) ON DELETE SET NULL,
     
     -- Başvuru Durumu
     status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled')),
@@ -77,7 +64,7 @@ CREATE TABLE IF NOT EXISTS summer_school_registrations (
     UNIQUE(student_id, offering_id)
 );
 
--- 4. Courses tablosuna faculty_id ekleme (eğer yoksa)
+-- 3. Courses tablosuna faculty_id ekleme (eğer yoksa)
 DO $$ 
 BEGIN
     IF NOT EXISTS (
@@ -89,9 +76,6 @@ BEGIN
 END $$;
 
 -- İndeksler oluştur
-CREATE INDEX IF NOT EXISTS idx_student_failed_courses_student_id ON student_failed_courses(student_id);
-CREATE INDEX IF NOT EXISTS idx_student_failed_courses_course_code ON student_failed_courses(course_code);
-
 CREATE INDEX IF NOT EXISTS idx_summer_offerings_university_id ON summer_school_offerings(university_id);
 CREATE INDEX IF NOT EXISTS idx_summer_offerings_faculty_id ON summer_school_offerings(faculty_id);
 CREATE INDEX IF NOT EXISTS idx_summer_offerings_academician_id ON summer_school_offerings(academician_id);
@@ -105,4 +89,5 @@ CREATE INDEX IF NOT EXISTS idx_summer_registrations_offering_id ON summer_school
 CREATE INDEX IF NOT EXISTS idx_summer_registrations_status ON summer_school_registrations(status);
 
 SELECT 'Yaz okulu tabloları başarıyla oluşturuldu!' as mesaj;
+
 

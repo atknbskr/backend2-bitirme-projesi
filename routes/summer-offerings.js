@@ -53,3 +53,5 @@ router.delete("/:id", authMiddleware, summerOfferingController.deleteOffering);
 
 module.exports = router;
 
+
+

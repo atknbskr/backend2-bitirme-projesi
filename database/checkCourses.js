@@ -53,3 +53,5 @@ async function checkCourses() {
 
 checkCourses();
 
+
+

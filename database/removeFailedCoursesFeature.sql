@@ -14,3 +14,5 @@ DROP INDEX IF EXISTS idx_student_failed_courses_course_code;
 SELECT 'Başarısız ders özelliği başarıyla kaldırıldı!' as mesaj;
 
 
+
+

@@ -35,3 +35,5 @@ CREATE INDEX IF NOT EXISTS idx_student_courses_enrollment_type ON student_course
 
 SELECT 'student_courses tablosu başarıyla oluşturuldu!' as mesaj;
 
+
+

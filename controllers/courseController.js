@@ -205,20 +205,28 @@ exports.getCourseStudents = async (req, res) => {
       });
     }
 
-    // Derse kayıtlı öğrencileri getir
+    // Derse kayıtlı öğrencileri getir (status bilgisi ile)
     const students = await sql`
       SELECT 
+        f.id as favorite_id,
         u.id,
         u.first_name,
         u.last_name,
         u.email,
         s.student_number,
+        f.status,
         f.created_at as enrolled_at
       FROM favorites f
       JOIN students s ON f.student_id = s.id
       JOIN users u ON s.user_id = u.id
       WHERE f.course_id = ${courseId}
-      ORDER BY f.created_at DESC
+      ORDER BY 
+        CASE f.status
+          WHEN 'pending' THEN 1
+          WHEN 'approved' THEN 2
+          WHEN 'rejected' THEN 3
+        END,
+        f.created_at DESC
     `;
 
     res.json({
@@ -226,6 +234,9 @@ exports.getCourseStudents = async (req, res) => {
       course: course[0],
       students,
       totalStudents: students.length,
+      pendingCount: students.filter(s => s.status === 'pending').length,
+      approvedCount: students.filter(s => s.status === 'approved').length,
+      rejectedCount: students.filter(s => s.status === 'rejected').length,
     });
   } catch (error) {
     console.error("Öğrenci listeleme hatası:", error);
@@ -491,6 +502,166 @@ exports.updateCourse = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Ders güncellenirken bir hata oluştu",
+    });
+  }
+};
+
+// Akademisyen: Ders başvurularını listele
+exports.getCourseApplications = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const courseId = req.params.id;
+
+    // Akademisyen ID'sini bul
+    const academician = await sql`
+      SELECT id FROM academicians WHERE user_id = ${userId}
+    `;
+
+    if (academician.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: "Bu işlem için akademisyen yetkisi gereklidir",
+      });
+    }
+
+    // Dersin akademisyene ait olup olmadığını kontrol et
+    const course = await sql`
+      SELECT id, course_name FROM courses 
+      WHERE id = ${courseId} AND academician_id = ${academician[0].id}
+    `;
+
+    if (course.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Ders bulunamadı veya erişim yetkiniz yok",
+      });
+    }
+
+    // Derse yapılan başvuruları getir
+    const applications = await sql`
+      SELECT 
+        f.id as favorite_id,
+        u.id as user_id,
+        u.first_name,
+        u.last_name,
+        u.email,
+        s.student_number,
+        f.status,
+        f.created_at as application_date
+      FROM favorites f
+      JOIN students s ON f.student_id = s.id
+      JOIN users u ON s.user_id = u.id
+      WHERE f.course_id = ${courseId}
+      ORDER BY 
+        CASE f.status
+          WHEN 'pending' THEN 1
+          WHEN 'approved' THEN 2
+          WHEN 'rejected' THEN 3
+        END,
+        f.created_at DESC
+    `;
+
+    res.json({
+      success: true,
+      course: course[0],
+      applications,
+      totalApplications: applications.length,
+      pendingCount: applications.filter(a => a.status === 'pending').length,
+      approvedCount: applications.filter(a => a.status === 'approved').length,
+      rejectedCount: applications.filter(a => a.status === 'rejected').length,
+    });
+  } catch (error) {
+    console.error("Başvurular listeleme hatası:", error);
+    res.status(500).json({
+      success: false,
+      message: "Başvurular alınırken bir hata oluştu",
+    });
+  }
+};
+
+// Akademisyen: Başvuru durumunu güncelle (onayla/reddet)
+exports.updateApplicationStatus = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const favoriteId = req.params.favoriteId;
+    const { status, rejectionReason } = req.body;
+
+    if (!status || !["approved", "rejected"].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Geçerli bir durum belirtilmelidir (approved veya rejected)",
+      });
+    }
+
+    // Akademisyen ID'sini bul
+    const academician = await sql`
+      SELECT id FROM academicians WHERE user_id = ${userId}
+    `;
+
+    if (academician.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: "Bu işlem için akademisyen yetkisi gereklidir",
+      });
+    }
+
+    // Başvurunun akademisyenin dersine ait olup olmadığını kontrol et
+    const favorite = await sql`
+      SELECT f.id, f.course_id, f.status, f.student_id
+      FROM favorites f
+      JOIN courses c ON f.course_id = c.id
+      WHERE f.id = ${favoriteId} AND c.academician_id = ${academician[0].id}
+    `;
+
+    if (favorite.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Başvuru bulunamadı veya erişim yetkiniz yok",
+      });
+    }
+
+    if (favorite[0].status !== "pending") {
+      return res.status(400).json({
+        success: false,
+        message: "Sadece beklemedeki başvurular güncellenebilir",
+      });
+    }
+
+    // Başvuru durumunu güncelle
+    await sql`
+      UPDATE favorites
+      SET status = ${status}
+      WHERE id = ${favoriteId}
+    `;
+
+    // Eğer reddedildiyse, öğrenci sayısını güncelleme (zaten artırılmamış olmalı)
+    // Eğer onaylandıysa, öğrenci sayısı zaten artırılmış olmalı (favorite eklendiğinde)
+    // Ama reddedilirse, eğer daha önce approved ise sayıyı azalt
+    const oldStatus = favorite[0].status;
+    if (oldStatus === "approved" && status === "rejected") {
+      await sql`
+        UPDATE courses 
+        SET student_count = GREATEST(student_count - 1, 0)
+        WHERE id = ${favorite[0].course_id}
+      `;
+    } else if (oldStatus === "pending" && status === "approved") {
+      // Pending'den approved'a geçerse, öğrenci sayısını artır
+      await sql`
+        UPDATE courses 
+        SET student_count = student_count + 1
+        WHERE id = ${favorite[0].course_id}
+      `;
+    }
+
+    res.json({
+      success: true,
+      message: status === "approved" ? "Başvuru onaylandı" : "Başvuru reddedildi",
+    });
+  } catch (error) {
+    console.error("Başvuru durumu güncelleme hatası:", error);
+    res.status(500).json({
+      success: false,
+      message: "Başvuru durumu güncellenirken bir hata oluştu",
     });
   }
 };

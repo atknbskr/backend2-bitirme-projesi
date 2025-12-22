@@ -9,7 +9,8 @@
     "init-db": "node database/initDatabase.js",
     "create-admin": "node database/createAdmin.js",
     "create-students": "node database/createStudents.js",
-    "update-deadlines": "node database/updateApplicationDeadlines.js"
+    "update-deadlines": "node database/updateApplicationDeadlines.js",
+    "add-status-to-favorites": "node database/runStatusMigration.js"
   },
   "keywords": [
     "campus",

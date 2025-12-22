@@ -37,3 +37,4 @@ SELECT 'student_courses tablosu başarıyla oluşturuldu!' as mesaj;
 
 
 
+

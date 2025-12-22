@@ -120,3 +120,5 @@ Hala sorun yaşıyorsanız:
 
 **Not:** `.env` dosyası Git'e eklenmez (güvenlik için). Her ortamda (local, production) ayrı ayrı oluşturulmalıdır.
 
+
+

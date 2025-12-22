@@ -10,19 +10,28 @@ exports.getAllCourses = async (req, res) => {
         c.course_code,
         c.description,
         c.category,
+        c.academician_id,
         c.university_count,
         c.student_count,
+        c.application_deadline,
+        c.start_date,
+        c.end_date,
         c.created_at,
-        u.first_name || ' ' || u.last_name as academician_name
+        u.first_name || ' ' || u.last_name as academician_name,
+        CASE 
+          WHEN c.application_deadline >= CURRENT_DATE THEN true
+          ELSE false
+        END as is_active
       FROM courses c
       LEFT JOIN academicians a ON c.academician_id = a.id
       LEFT JOIN users u ON a.user_id = u.id
+      WHERE c.application_deadline IS NULL OR c.application_deadline >= CURRENT_DATE
       ORDER BY c.created_at DESC
     `;
 
     res.json({
       success: true,
-      data: courses,
+      courses: courses,
     });
   } catch (error) {
     console.error("Ders listeleme hatası:", error);
@@ -60,7 +69,14 @@ exports.getMyCourses = async (req, res) => {
         category,
         university_count,
         student_count,
-        created_at
+        application_deadline,
+        start_date,
+        end_date,
+        created_at,
+        CASE 
+          WHEN application_deadline >= CURRENT_DATE THEN true
+          ELSE false
+        END as is_active
       FROM courses
       WHERE academician_id = ${academician[0].id}
         AND (university_id = ${academician[0].university_id} OR university_id IS NULL)
@@ -69,7 +85,7 @@ exports.getMyCourses = async (req, res) => {
 
     res.json({
       success: true,
-      data: courses,
+      courses: courses,
     });
   } catch (error) {
     console.error("Ders listeleme hatası:", error);
@@ -85,7 +101,7 @@ exports.createCourse = async (req, res) => {
   try {
     const userId = req.user.id;
     const userType = req.user.userType;
-    const { courseName, courseCode, description, category, academicianId } = req.body;
+    const { courseName, courseCode, description, category, academicianId, applicationDeadline, startDate, endDate } = req.body;
 
     if (!courseName || courseName.trim() === '') {
       return res.status(400).json({
@@ -138,8 +154,8 @@ exports.createCourse = async (req, res) => {
 
     // Ders oluştur
     const newCourse = await sql`
-      INSERT INTO courses (academician_id, course_name, course_code, description, category, university_id)
-      VALUES (${finalAcademicianId}, ${courseName}, ${courseCode || null}, ${description || null}, ${category || null}, ${finalUniversityId})
+      INSERT INTO courses (academician_id, course_name, course_code, description, category, university_id, application_deadline, start_date, end_date)
+      VALUES (${finalAcademicianId}, ${courseName}, ${courseCode || null}, ${description || null}, ${category || null}, ${finalUniversityId}, ${applicationDeadline || null}, ${startDate || null}, ${endDate || null})
       RETURNING *
     `;
 
@@ -216,6 +232,265 @@ exports.getCourseStudents = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Öğrenciler alınırken bir hata oluştu",
+    });
+  }
+};
+
+// Akademisyenin derslerini öğrencilerle birlikte listele
+exports.getMyCoursesWithStudents = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Akademisyen ID'sini bul
+    const academician = await sql`
+      SELECT id, university_id FROM academicians WHERE user_id = ${userId}
+    `;
+
+    if (academician.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: "Bu işlem için akademisyen yetkisi gereklidir",
+      });
+    }
+
+    // Akademisyenin derslerini getir
+    const courses = await sql`
+      SELECT 
+        c.id,
+        c.course_name,
+        c.course_code,
+        c.description,
+        c.category,
+        c.university_count,
+        c.student_count,
+        c.application_deadline,
+        c.start_date,
+        c.end_date,
+        c.created_at,
+        CASE 
+          WHEN c.application_deadline >= CURRENT_DATE THEN true
+          ELSE false
+        END as is_active
+      FROM courses c
+      WHERE c.academician_id = ${academician[0].id}
+        AND (c.university_id = ${academician[0].university_id} OR c.university_id IS NULL)
+      ORDER BY c.created_at DESC
+    `;
+
+    // Her ders için öğrencileri getir
+    const coursesWithStudents = await Promise.all(
+      courses.map(async (course) => {
+        const students = await sql`
+          SELECT 
+            u.id,
+            u.first_name,
+            u.last_name,
+            u.email,
+            s.student_number,
+            f.created_at as enrolled_at
+          FROM favorites f
+          JOIN students s ON f.student_id = s.id
+          JOIN users u ON s.user_id = u.id
+          WHERE f.course_id = ${course.id}
+          ORDER BY f.created_at DESC
+        `;
+
+        return {
+          ...course,
+          students: students,
+          student_count: students.length,
+        };
+      })
+    );
+
+    res.json({
+      success: true,
+      courses: coursesWithStudents,
+    });
+  } catch (error) {
+    console.error("Ders listeleme hatası:", error);
+    res.status(500).json({
+      success: false,
+      message: "Dersler alınırken bir hata oluştu",
+    });
+  }
+};
+
+// Ders detaylarını getir (akademisyen bilgileri ile)
+exports.getCourseDetails = async (req, res) => {
+  try {
+    const courseId = req.params.id;
+
+    // Ders bilgilerini akademisyen detayları ile getir
+    const course = await sql`
+      SELECT 
+        c.id,
+        c.course_name,
+        c.course_code,
+        c.description,
+        c.category,
+        c.credits,
+        c.price,
+        c.course_hours,
+        c.quota,
+        c.requirements,
+        c.equivalency_info,
+        c.university_count,
+        c.student_count,
+        c.application_deadline,
+        c.start_date,
+        c.end_date,
+        c.created_at,
+        a.id as academician_id,
+        a.username as academician_username,
+        a.title as academician_title,
+        a.office as academician_office,
+        a.office_hours as academician_office_hours,
+        a.department as academician_department,
+        u.first_name as academician_first_name,
+        u.last_name as academician_last_name,
+        u.email as academician_email
+      FROM courses c
+      LEFT JOIN academicians a ON c.academician_id = a.id
+      LEFT JOIN users u ON a.user_id = u.id
+      WHERE c.id = ${courseId}
+    `;
+
+    if (course.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Ders bulunamadı",
+      });
+    }
+
+    // Akademisyen bilgilerini düzenle
+    const courseData = {
+      ...course[0],
+      academician: course[0].academician_id ? {
+        id: course[0].academician_id,
+        username: course[0].academician_username,
+        title: course[0].academician_title,
+        full_name: `${course[0].academician_first_name || ''} ${course[0].academician_last_name || ''}`.trim(),
+        email: course[0].academician_email,
+        office: course[0].academician_office,
+        office_hours: course[0].academician_office_hours,
+        department: course[0].academician_department,
+      } : null
+    };
+
+    // Akademisyen alanlarını temizle
+    delete courseData.academician_id;
+    delete courseData.academician_username;
+    delete courseData.academician_title;
+    delete courseData.academician_first_name;
+    delete courseData.academician_last_name;
+    delete courseData.academician_email;
+    delete courseData.academician_office;
+    delete courseData.academician_office_hours;
+    delete courseData.academician_department;
+
+    res.json({
+      success: true,
+      course: courseData,
+    });
+  } catch (error) {
+    console.error("Ders detay hatası:", error);
+    res.status(500).json({
+      success: false,
+      message: "Ders detayları alınırken bir hata oluştu",
+    });
+  }
+};
+
+// Ders güncelle
+exports.updateCourse = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const userType = req.user.userType;
+    const courseId = req.params.id;
+    const { courseName, courseCode, description, category, academicianId, applicationDeadline, startDate, endDate } = req.body;
+
+    // Ders var mı kontrol et
+    const existingCourse = await sql`SELECT * FROM courses WHERE id = ${courseId}`;
+    if (existingCourse.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Ders bulunamadı",
+      });
+    }
+
+    let finalAcademicianId = existingCourse[0].academician_id;
+    let finalUniversityId = existingCourse[0].university_id;
+
+    // Admin ise, tüm dersleri güncelleyebilir
+    if (userType === 'admin') {
+      // Akademisyen ID değiştiriliyorsa kontrol et
+      if (academicianId !== undefined) {
+        if (academicianId === null || academicianId === '') {
+          finalAcademicianId = null;
+          finalUniversityId = null;
+        } else {
+          const academician = await sql`SELECT id, university_id FROM academicians WHERE id = ${academicianId}`;
+          if (academician.length === 0) {
+            return res.status(400).json({
+              success: false,
+              message: "Geçersiz akademisyen ID",
+            });
+          }
+          finalAcademicianId = academicianId;
+          finalUniversityId = academician[0].university_id;
+        }
+      }
+    } else {
+      // Akademisyen ise, sadece kendi dersini güncelleyebilir
+      const academician = await sql`
+        SELECT id, university_id FROM academicians WHERE user_id = ${userId}
+      `;
+
+      if (academician.length === 0) {
+        return res.status(403).json({
+          success: false,
+          message: "Bu işlem için akademisyen yetkisi gereklidir",
+        });
+      }
+
+      // Dersin sahibi kontrolü
+      if (existingCourse[0].academician_id !== academician[0].id) {
+        return res.status(403).json({
+          success: false,
+          message: "Bu dersi güncelleme yetkiniz yok",
+        });
+      }
+
+      finalAcademicianId = academician[0].id;
+      finalUniversityId = academician[0].university_id;
+    }
+
+    // Dersi güncelle
+    await sql`
+      UPDATE courses 
+      SET 
+        course_name = COALESCE(${courseName}, course_name),
+        course_code = COALESCE(${courseCode}, course_code),
+        description = COALESCE(${description}, description),
+        category = COALESCE(${category}, category),
+        academician_id = ${finalAcademicianId},
+        university_id = ${finalUniversityId},
+        application_deadline = COALESCE(${applicationDeadline}, application_deadline),
+        start_date = COALESCE(${startDate}, start_date),
+        end_date = COALESCE(${endDate}, end_date)
+      WHERE id = ${courseId}
+    `;
+
+    res.json({
+      success: true,
+      message: "Ders başarıyla güncellendi",
+    });
+  } catch (error) {
+    console.error("Ders güncelleme hatası:", error);
+    res.status(500).json({
+      success: false,
+      message: "Ders güncellenirken bir hata oluştu",
     });
   }
 };

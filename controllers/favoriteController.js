@@ -5,20 +5,26 @@ exports.getMyFavorites = async (req, res) => {
   try {
     const userId = req.user.id;
 
+    console.log('Favori listesi istendi, user_id:', userId);
+
     // Öğrenci ID'sini bul
     const student = await sql`
       SELECT id FROM students WHERE user_id = ${userId}
     `;
 
     if (student.length === 0) {
+      console.log('Öğrenci bulunamadı, user_id:', userId);
       return res.status(403).json({
         success: false,
         message: "Bu işlem için öğrenci yetkisi gereklidir",
       });
     }
 
+    console.log('Öğrenci bulundu, student_id:', student[0].id);
+
     const favorites = await sql`
       SELECT 
+        f.id as favorite_id,
         c.id,
         c.course_name,
         c.course_code,
@@ -26,8 +32,12 @@ exports.getMyFavorites = async (req, res) => {
         c.category,
         c.university_count,
         c.student_count,
+        c.application_deadline,
+        c.start_date,
+        c.end_date,
+        c.created_at,
         f.created_at as favorited_at,
-        u.first_name || ' ' || u.last_name as academician_name
+        COALESCE(u.first_name || ' ' || u.last_name, 'Belirtilmemiş') as academician_name
       FROM favorites f
       JOIN courses c ON f.course_id = c.id
       LEFT JOIN academicians a ON c.academician_id = a.id
@@ -36,15 +46,19 @@ exports.getMyFavorites = async (req, res) => {
       ORDER BY f.created_at DESC
     `;
 
+    console.log(`${favorites.length} favori ders bulundu`);
+
     res.json({
       success: true,
-      favorites,
+      favorites: favorites,
+      totalFavorites: favorites.length,
     });
   } catch (error) {
     console.error("Favori listeleme hatası:", error);
     res.status(500).json({
       success: false,
       message: "Favoriler alınırken bir hata oluştu",
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };

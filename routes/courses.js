@@ -20,8 +20,14 @@ const validate = (req, res, next) => {
 // Tüm dersleri listele (herkese açık)
 router.get("/", courseController.getAllCourses);
 
+// Ders detaylarını getir (herkese açık)
+router.get("/:id/details", courseController.getCourseDetails);
+
 // Akademisyenin kendi derslerini listele
 router.get("/my-courses", authMiddleware, courseController.getMyCourses);
+
+// Akademisyenin derslerini öğrencilerle birlikte listele
+router.get("/my-courses-with-students", authMiddleware, courseController.getMyCoursesWithStudents);
 
 // Derse kayıtlı öğrencileri getir (sadece akademisyen - kendi dersleri)
 router.get("/:id/students", authMiddleware, courseController.getCourseStudents);
@@ -37,6 +43,9 @@ router.post(
   validate,
   courseController.createCourse
 );
+
+// Ders güncelle (sadece akademisyen - kendi dersleri veya admin)
+router.put("/:id", authMiddleware, courseController.updateCourse);
 
 // Ders sil (sadece akademisyen - kendi dersleri)
 router.delete("/:id", authMiddleware, courseController.deleteCourse);

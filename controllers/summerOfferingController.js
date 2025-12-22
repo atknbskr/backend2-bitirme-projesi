@@ -40,6 +40,7 @@ exports.getAllOfferings = async (req, res) => {
             so.equivalency_info,
             so.requirements,
             so.is_active,
+            so.udemy_link,
             so.created_at,
             u.name as university_name,
             u.city as university_city,
@@ -76,6 +77,7 @@ exports.getAllOfferings = async (req, res) => {
             so.equivalency_info,
             so.requirements,
             so.is_active,
+            so.udemy_link,
             so.created_at,
             u.name as university_name,
             u.city as university_city,
@@ -114,6 +116,7 @@ exports.getAllOfferings = async (req, res) => {
           so.equivalency_info,
           so.requirements,
           so.is_active,
+          so.udemy_link,
           so.created_at,
           u.name as university_name,
           u.city as university_city,
@@ -175,6 +178,7 @@ exports.getOfferingById = async (req, res) => {
     const offering = await sql`
       SELECT 
         so.*,
+        so.udemy_link,
         u.name as university_name,
         u.city as university_city,
         u.type as university_type,
@@ -232,6 +236,7 @@ exports.getMyOfferings = async (req, res) => {
     const offerings = await sql`
       SELECT 
         so.*,
+        so.udemy_link,
         u.name as university_name,
         u.city as university_city,
         f.name as faculty_name,
@@ -277,6 +282,7 @@ exports.createOffering = async (req, res) => {
       quota,
       equivalencyInfo,
       requirements,
+      udemyLink,
     } = req.body;
 
     // Validasyon
@@ -325,7 +331,8 @@ exports.createOffering = async (req, res) => {
         price,
         quota,
         equivalency_info,
-        requirements
+        requirements,
+        udemy_link
       )
       VALUES (
         ${courseId || null},
@@ -344,7 +351,8 @@ exports.createOffering = async (req, res) => {
         ${price || 0},
         ${quota || 30},
         ${equivalencyInfo || null},
-        ${requirements || null}
+        ${requirements || null},
+        ${udemyLink || null}
       )
       RETURNING *
     `;
@@ -412,6 +420,7 @@ exports.updateOffering = async (req, res) => {
         quota = COALESCE(${updateData.quota}, quota),
         equivalency_info = COALESCE(${updateData.equivalencyInfo}, equivalency_info),
         requirements = COALESCE(${updateData.requirements}, requirements),
+        udemy_link = COALESCE(${updateData.udemyLink}, udemy_link),
         is_active = COALESCE(${updateData.isActive}, is_active),
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ${offeringId}

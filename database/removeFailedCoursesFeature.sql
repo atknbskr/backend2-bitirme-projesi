@@ -17,3 +17,4 @@ SELECT 'Başarısız ders özelliği başarıyla kaldırıldı!' as mesaj;
 
 
 
+

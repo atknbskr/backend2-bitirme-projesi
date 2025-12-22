@@ -45,3 +45,4 @@ Eğer sonuç dönerse, migration başarılıdır! ✅
 - Akademisyenler başvuruları `approved` veya `rejected` olarak değiştirebilir
 
 
+

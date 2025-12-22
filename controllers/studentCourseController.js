@@ -33,6 +33,7 @@ exports.getMyEnrolledCourses = async (req, res) => {
         so.start_date,
         so.end_date,
         so.price,
+        so.udemy_link,
         sr.status as registration_status
       FROM student_courses sc
       LEFT JOIN summer_school_offerings so ON sc.summer_offering_id = so.id
@@ -175,6 +176,7 @@ exports.withdrawFromCourse = async (req, res) => {
     });
   }
 };
+
 
 
 

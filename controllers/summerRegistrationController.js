@@ -166,9 +166,65 @@ exports.createRegistration = async (req, res) => {
       WHERE id = ${offeringId}
     `;
 
+    // Öğrencinin derslerine ekle
+    try {
+      // Teklif bilgilerini al
+      const offeringDetails = await sql`
+        SELECT 
+          so.course_id,
+          so.course_name,
+          so.course_code,
+          so.credits,
+          u.name as university_name
+        FROM summer_school_offerings so
+        LEFT JOIN universities u ON so.university_id = u.id
+        WHERE so.id = ${offeringId}
+      `;
+
+      const offering = offeringDetails[0];
+
+      // student_courses tablosuna ekle
+      await sql`
+        INSERT INTO student_courses (
+          student_id,
+          course_id,
+          summer_offering_id,
+          registration_id,
+          course_name,
+          course_code,
+          university_name,
+          credits,
+          enrollment_type,
+          status
+        )
+        VALUES (
+          ${student[0].id},
+          ${offering.course_id},
+          ${offeringId},
+          ${newRegistration[0].id},
+          ${offering.course_name},
+          ${offering.course_code},
+          ${offering.university_name},
+          ${offering.credits},
+          'summer_school',
+          'active'
+        )
+        ON CONFLICT (student_id, course_code) 
+        DO UPDATE SET 
+          registration_id = ${newRegistration[0].id},
+          summer_offering_id = ${offeringId},
+          status = 'active'
+      `;
+
+      console.log(`✅ Öğrenci ${student[0].id} için ders ${offering.course_code} eklendi`);
+    } catch (courseError) {
+      console.error("Derse kayıt eklenirken hata:", courseError);
+      // Hata olsa bile başvuru devam etsin
+    }
+
     res.status(201).json({
       success: true,
-      message: "Başvurunuz başarıyla alındı",
+      message: "Başvurunuz başarıyla alındı ve derslerinize eklendi",
       data: newRegistration[0],
     });
   } catch (error) {
@@ -371,9 +427,66 @@ exports.updateRegistrationStatus = async (req, res) => {
       RETURNING *
     `;
 
+    // Eğer onaylandıysa, öğrencinin derslerine ekle
+    if (status === "approved") {
+      try {
+        // Başvuru bilgilerini al
+        const registrationDetails = await sql`
+          SELECT 
+            sr.student_id,
+            sr.offering_id,
+            so.course_id,
+            so.course_name,
+            so.course_code,
+            so.credits,
+            u.name as university_name
+          FROM summer_school_registrations sr
+          JOIN summer_school_offerings so ON sr.offering_id = so.id
+          LEFT JOIN universities u ON so.university_id = u.id
+          WHERE sr.id = ${registrationId}
+        `;
+
+        const regDetail = registrationDetails[0];
+
+        // Öğrencinin derslerine ekle
+        await sql`
+          INSERT INTO student_courses (
+            student_id,
+            course_id,
+            summer_offering_id,
+            registration_id,
+            course_name,
+            course_code,
+            university_name,
+            credits,
+            enrollment_type,
+            status
+          )
+          VALUES (
+            ${regDetail.student_id},
+            ${regDetail.course_id},
+            ${regDetail.offering_id},
+            ${registrationId},
+            ${regDetail.course_name},
+            ${regDetail.course_code},
+            ${regDetail.university_name},
+            ${regDetail.credits},
+            'summer_school',
+            'active'
+          )
+          ON CONFLICT (student_id, course_code) DO NOTHING
+        `;
+
+        console.log(`✅ Öğrenci ${regDetail.student_id} için ders ${regDetail.course_code} eklendi`);
+      } catch (courseError) {
+        console.error("Derse kayıt eklenirken hata:", courseError);
+        // Hata olsa bile başvuru onayı devam etsin
+      }
+    }
+
     res.json({
       success: true,
-      message: status === "approved" ? "Başvuru onaylandı" : "Başvuru reddedildi",
+      message: status === "approved" ? "Başvuru onaylandı ve ders kaydınıza eklendi" : "Başvuru reddedildi",
       data: updated[0],
     });
   } catch (error) {

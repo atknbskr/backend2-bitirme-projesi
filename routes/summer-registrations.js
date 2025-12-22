@@ -26,7 +26,6 @@ router.post(
   authMiddleware,
   [
     body("offeringId").notEmpty().isInt().withMessage("Teklif ID gerekli"),
-    body("failedCourseId").optional().isInt(),
     body("applicationNote").optional().isString(),
   ],
   validate,

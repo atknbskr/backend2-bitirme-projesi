@@ -15,6 +15,7 @@ const announcementRoutes = require("./routes/announcements");
 const courseApplicationsRoutes = require("./routes/course-applications");
 const studentCoursesRoutes = require("./routes/student-courses");
 const notificationRoutes = require("./routes/notifications");
+const contactRoutes = require("./routes/contact");
 
 const app = express();
 const PORT = process.env.PORT || 5500;
@@ -49,6 +50,7 @@ app.use("/api/announcements", announcementRoutes);
 app.use("/api/course-applications", courseApplicationsRoutes);
 app.use("/api/student-courses", studentCoursesRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/contact", contactRoutes);
 
 // Health check
 app.get("/api/health", (req, res) => {

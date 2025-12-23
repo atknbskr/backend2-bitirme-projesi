@@ -3,6 +3,9 @@ const sql = require("../config/db");
 // Öğrencinin başvurularını listele
 exports.getMyRegistrations = async (req, res) => {
   try {
+    // Tablo var mı kontrol et
+    await ensureTableExists();
+    
     const userId = req.user.id;
 
     // Öğrenci ID'sini bul
@@ -111,9 +114,62 @@ exports.getMyRegistrations = async (req, res) => {
   }
 };
 
+// Tablo var mı kontrol et ve yoksa oluştur
+async function ensureTableExists() {
+  try {
+    // Tablo var mı kontrol et
+    const tableCheck = await sql`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'summer_school_registrations'
+      )
+    `;
+    
+    if (!tableCheck[0]?.exists) {
+      console.log('summer_school_registrations tablosu bulunamadı, oluşturuluyor...');
+      
+      // Tabloyu oluştur
+      await sql`
+        CREATE TABLE IF NOT EXISTS summer_school_registrations (
+          id SERIAL PRIMARY KEY,
+          student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+          offering_id INTEGER NOT NULL REFERENCES summer_school_offerings(id) ON DELETE CASCADE,
+          status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled')),
+          application_note TEXT,
+          rejection_reason TEXT,
+          application_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          status_updated_at TIMESTAMP,
+          status_updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+          UNIQUE(student_id, offering_id)
+        )
+      `;
+      
+      // İndeksleri oluştur
+      await sql`
+        CREATE INDEX IF NOT EXISTS idx_summer_registrations_student_id ON summer_school_registrations(student_id)
+      `;
+      await sql`
+        CREATE INDEX IF NOT EXISTS idx_summer_registrations_offering_id ON summer_school_registrations(offering_id)
+      `;
+      await sql`
+        CREATE INDEX IF NOT EXISTS idx_summer_registrations_status ON summer_school_registrations(status)
+      `;
+      
+      console.log('✅ summer_school_registrations tablosu başarıyla oluşturuldu');
+    }
+  } catch (error) {
+    console.error('Tablo oluşturma hatası:', error);
+    throw error;
+  }
+}
+
 // Yeni başvuru yap
 exports.createRegistration = async (req, res) => {
   try {
+    // Tablo var mı kontrol et
+    await ensureTableExists();
+    
     const userId = req.user.id;
     const { offeringId, applicationNote } = req.body;
 
@@ -296,6 +352,9 @@ exports.createRegistration = async (req, res) => {
 // Başvuruyu iptal et
 exports.cancelRegistration = async (req, res) => {
   try {
+    // Tablo var mı kontrol et
+    await ensureTableExists();
+    
     const userId = req.user.id;
     const registrationId = req.params.id;
 
@@ -364,6 +423,9 @@ exports.cancelRegistration = async (req, res) => {
 // Akademisyen: Bir teklife yapılan başvuruları görüntüle
 exports.getOfferingRegistrations = async (req, res) => {
   try {
+    // Tablo var mı kontrol et
+    await ensureTableExists();
+    
     const userId = req.user.id;
     const offeringId = parseInt(req.params.offeringId);
 
@@ -509,6 +571,9 @@ exports.getOfferingRegistrations = async (req, res) => {
 // Akademisyen: Başvuru durumunu güncelle (onayla/reddet)
 exports.updateRegistrationStatus = async (req, res) => {
   try {
+    // Tablo var mı kontrol et
+    await ensureTableExists();
+    
     const userId = req.user.id;
     const registrationId = req.params.id;
     const { status, rejectionReason } = req.body;

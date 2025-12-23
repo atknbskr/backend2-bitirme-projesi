@@ -24,3 +24,5 @@ VALUES
 ('ÖĞRENCİLERİN DİKKATİNE', 'Kişisel bilgilerinizin güvenliği için Öğrenci Bilgi Sistemi şifrenizi güncellemeniz önemlidir.', 'student', 2, NULL),
 ('YAZ DÖNEMİ KAYIT', 'Yaz dönemi ders kayıtları 15 Haziran tarihinde başlayacaktır.', 'all', 1, NULL);
 
+
+

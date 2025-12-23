@@ -91,3 +91,5 @@ LEFT JOIN (
 GROUP BY u.id, u.name, u.city, u.type
 ORDER BY u.name ASC;
 
+
+

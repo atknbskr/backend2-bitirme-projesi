@@ -334,20 +334,10 @@ exports.getAllUniversities = async (req, res) => {
         SELECT 
           u.*,
           COUNT(DISTINCT a.id) as academician_count,
-          COUNT(DISTINCT student_courses.student_id) as student_count
+          COALESCE(SUM(so.current_registrations), 0) as student_count
         FROM universities u
         LEFT JOIN academicians a ON u.id = a.university_id
-          LEFT JOIN (
-          -- Öğrenciler hangi üniversitenin dersini seçmişse o üniversiteye aittir
-          SELECT DISTINCT 
-            s.id as student_id,
-            acad.university_id
-          FROM students s
-          LEFT JOIN favorites f ON s.id = f.student_id
-          LEFT JOIN courses c ON f.course_id = c.id
-          LEFT JOIN academicians acad ON c.academician_id = acad.id
-          WHERE acad.university_id IS NOT NULL
-        ) student_courses ON student_courses.university_id = u.id
+        LEFT JOIN summer_school_offerings so ON u.id = so.university_id AND so.is_active = true
         WHERE 1=1
           ${city ? sql`AND u.city = ${city}` : sql``}
           ${type ? sql`AND u.type = ${type}` : sql``}
@@ -359,20 +349,10 @@ exports.getAllUniversities = async (req, res) => {
         SELECT 
           u.*,
           COUNT(DISTINCT a.id) as academician_count,
-          COUNT(DISTINCT student_courses.student_id) as student_count
+          COALESCE(SUM(so.current_registrations), 0) as student_count
         FROM universities u
         LEFT JOIN academicians a ON u.id = a.university_id
-          LEFT JOIN (
-          -- Öğrenciler hangi üniversitenin dersini seçmişse o üniversiteye aittir
-          SELECT DISTINCT 
-            s.id as student_id,
-            acad.university_id
-          FROM students s
-          LEFT JOIN favorites f ON s.id = f.student_id
-          LEFT JOIN courses c ON f.course_id = c.id
-          LEFT JOIN academicians acad ON c.academician_id = acad.id
-          WHERE acad.university_id IS NOT NULL
-        ) student_courses ON student_courses.university_id = u.id
+        LEFT JOIN summer_school_offerings so ON u.id = so.university_id AND so.is_active = true
         GROUP BY u.id
         ORDER BY u.name ASC
       `;
@@ -385,7 +365,7 @@ exports.getAllUniversities = async (req, res) => {
       ORDER BY city ASC
     `;
 
-    res.json({
+    const result = {
       success: true,
       universities: universities.map(u => ({
         ...u,
@@ -393,12 +373,18 @@ exports.getAllUniversities = async (req, res) => {
         student_count: parseInt(u.student_count) || 0
       })),
       cities: cities.map(c => c.city),
-    });
+    };
+
+    res.json(result);
   } catch (error) {
     console.error("Üniversite listeleme hatası:", error);
+    console.error("Hata detayı:", error.message);
+    console.error("Hata kodu:", error.code);
+    console.error("Stack trace:", error.stack);
     res.status(500).json({
       success: false,
       message: "Üniversiteler alınırken bir hata oluştu",
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };

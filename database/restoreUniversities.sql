@@ -55,3 +55,5 @@ LEFT JOIN academicians a ON u.id = a.university_id
 GROUP BY u.name
 ORDER BY academician_count DESC;
 
+
+

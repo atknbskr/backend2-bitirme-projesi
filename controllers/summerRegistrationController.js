@@ -17,36 +17,86 @@ exports.getMyRegistrations = async (req, res) => {
       });
     }
 
-    const registrations = await sql`
-      SELECT 
-        sr.id,
-        sr.status,
-        sr.application_note,
-        sr.rejection_reason,
-        sr.application_date,
-        sr.status_updated_at,
-        so.id as offering_id,
-        so.course_name,
-        so.course_code,
-        so.start_date,
-        so.end_date,
-        so.application_deadline,
-        so.price,
-        so.quota,
-        so.current_registrations,
-        u.name as university_name,
-        u.city as university_city,
-        f.name as faculty_name,
-        sfc.course_name as failed_course_name,
-        sfc.course_code as failed_course_code
-      FROM summer_school_registrations sr
-      LEFT JOIN summer_school_offerings so ON sr.offering_id = so.id
-      LEFT JOIN universities u ON so.university_id = u.id
-      LEFT JOIN faculties f ON so.faculty_id = f.id
-      LEFT JOIN student_failed_courses sfc ON sr.failed_course_id = sfc.id
-      WHERE sr.student_id = ${student[0].id}
-      ORDER BY sr.application_date DESC
-    `;
+    // Önce student_failed_courses tablosunun var olup olmadığını kontrol et
+    let tableExists = false;
+    try {
+      const checkTable = await sql`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = 'student_failed_courses'
+        )
+      `;
+      tableExists = checkTable[0]?.exists || false;
+    } catch (err) {
+      console.log("[getMyRegistrations] Tablo kontrolü hatası:", err.message);
+    }
+
+    // Başvuruları getir
+    let registrations;
+    if (tableExists) {
+      registrations = await sql`
+        SELECT 
+          sr.id,
+          sr.status,
+          sr.application_note,
+          sr.rejection_reason,
+          sr.application_date,
+          sr.status_updated_at,
+          so.id as offering_id,
+          so.course_name,
+          so.course_code,
+          so.start_date,
+          so.end_date,
+          so.application_deadline,
+          so.price,
+          so.quota,
+          so.current_registrations,
+          u.name as university_name,
+          u.city as university_city,
+          f.name as faculty_name,
+          sfc.course_name as failed_course_name,
+          sfc.course_code as failed_course_code
+        FROM summer_school_registrations sr
+        LEFT JOIN summer_school_offerings so ON sr.offering_id = so.id
+        LEFT JOIN universities u ON so.university_id = u.id
+        LEFT JOIN faculties f ON so.faculty_id = f.id
+        LEFT JOIN student_failed_courses sfc ON sr.failed_course_id = sfc.id
+        WHERE sr.student_id = ${student[0].id}
+        ORDER BY sr.application_date DESC
+      `;
+    } else {
+      // Tablo yoksa LEFT JOIN olmadan getir
+      registrations = await sql`
+        SELECT 
+          sr.id,
+          sr.status,
+          sr.application_note,
+          sr.rejection_reason,
+          sr.application_date,
+          sr.status_updated_at,
+          so.id as offering_id,
+          so.course_name,
+          so.course_code,
+          so.start_date,
+          so.end_date,
+          so.application_deadline,
+          so.price,
+          so.quota,
+          so.current_registrations,
+          u.name as university_name,
+          u.city as university_city,
+          f.name as faculty_name,
+          NULL as failed_course_name,
+          NULL as failed_course_code
+        FROM summer_school_registrations sr
+        LEFT JOIN summer_school_offerings so ON sr.offering_id = so.id
+        LEFT JOIN universities u ON so.university_id = u.id
+        LEFT JOIN faculties f ON so.faculty_id = f.id
+        WHERE sr.student_id = ${student[0].id}
+        ORDER BY sr.application_date DESC
+      `;
+    }
 
     res.json({
       success: true,
@@ -146,6 +196,8 @@ exports.createRegistration = async (req, res) => {
     }
 
     // Başvuru oluştur
+    console.log(`[createRegistration] Başvuru oluşturuluyor - student_id: ${student[0].id}, offering_id: ${offeringId}`);
+    
     const newRegistration = await sql`
       INSERT INTO summer_school_registrations (
         student_id,
@@ -164,23 +216,25 @@ exports.createRegistration = async (req, res) => {
       RETURNING *
     `;
 
-    // Teklifteki current_registrations sayısını artır
-    await sql`
-      UPDATE summer_school_offerings
-      SET current_registrations = current_registrations + 1
-      WHERE id = ${offeringId}
-    `;
+    console.log(`[createRegistration] Başvuru oluşturuldu - registration_id: ${newRegistration[0].id}, offering_id: ${newRegistration[0].offering_id}`);
+
+    // NOT: current_registrations sadece başvuru onaylandığında artırılacak
+    // Başvuru yapıldığında artırılmaz, çünkü henüz onaylanmamıştır
 
     res.status(201).json({
       success: true,
-      message: "Başvurunuz başarıyla alındı",
+      message: "Başvurunuz başarıyla alındı. Akademisyen onayı bekleniyor.",
       data: newRegistration[0],
     });
   } catch (error) {
     console.error("Başvuru oluşturma hatası:", error);
+    console.error("Hata detayı:", error.message);
+    console.error("Stack trace:", error.stack);
     res.status(500).json({
       success: false,
       message: "Başvuru oluşturulurken bir hata oluştu",
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     });
   }
 };
@@ -230,12 +284,15 @@ exports.cancelRegistration = async (req, res) => {
       WHERE id = ${registrationId}
     `;
 
-    // Teklifteki current_registrations sayısını azalt
-    await sql`
-      UPDATE summer_school_offerings
-      SET current_registrations = GREATEST(0, current_registrations - 1)
-      WHERE id = ${registration[0].offering_id}
-    `;
+    // Sadece onaylanmış başvurular iptal edildiğinde current_registrations azaltılır
+    // Pending durumundaki başvurular iptal edildiğinde azaltılmaz
+    if (registration[0].status === "approved") {
+      await sql`
+        UPDATE summer_school_offerings
+        SET current_registrations = GREATEST(0, current_registrations - 1)
+        WHERE id = ${registration[0].offering_id}
+      `;
+    }
 
     res.json({
       success: true,
@@ -254,7 +311,9 @@ exports.cancelRegistration = async (req, res) => {
 exports.getOfferingRegistrations = async (req, res) => {
   try {
     const userId = req.user.id;
-    const offeringId = req.params.offeringId;
+    const offeringId = parseInt(req.params.offeringId);
+
+    console.log(`[getOfferingRegistrations] İstek alındı - userId: ${userId}, offeringId: ${offeringId}`);
 
     // Akademisyen ID'sini bul
     const academician = await sql`
@@ -262,47 +321,118 @@ exports.getOfferingRegistrations = async (req, res) => {
     `;
 
     if (academician.length === 0) {
+      console.log(`[getOfferingRegistrations] Akademisyen bulunamadı - userId: ${userId}`);
       return res.status(403).json({
         success: false,
         message: "Bu işlem için akademisyen yetkisi gereklidir",
       });
     }
 
+    console.log(`[getOfferingRegistrations] Akademisyen ID: ${academician[0].id}`);
+
     // Teklifin akademisyene ait olup olmadığını kontrol et
     const offering = await sql`
-      SELECT id, course_name FROM summer_school_offerings
-      WHERE id = ${offeringId} AND academician_id = ${academician[0].id}
+      SELECT 
+        id, 
+        course_name, 
+        course_code,
+        academician_id,
+        university_id,
+        faculty_id,
+        start_date,
+        end_date,
+        application_deadline,
+        price,
+        quota,
+        current_registrations
+      FROM summer_school_offerings
+      WHERE id = ${offeringId}
     `;
 
     if (offering.length === 0) {
+      console.log(`[getOfferingRegistrations] Teklif bulunamadı - offeringId: ${offeringId}`);
       return res.status(404).json({
         success: false,
-        message: "Teklif bulunamadı veya erişim yetkiniz yok",
+        message: "Teklif bulunamadı",
       });
     }
 
+    console.log(`[getOfferingRegistrations] Teklif bulundu - offeringId: ${offering[0].id}, academician_id: ${offering[0].academician_id}, istenen academician_id: ${academician[0].id}`);
+
+    if (offering[0].academician_id !== academician[0].id) {
+      console.log(`[getOfferingRegistrations] Erişim yetkisi yok - teklif academician_id: ${offering[0].academician_id}, kullanıcı academician_id: ${academician[0].id}`);
+      return res.status(403).json({
+        success: false,
+        message: "Bu teklife erişim yetkiniz yok",
+      });
+    }
+
+    // Önce student_failed_courses tablosunun var olup olmadığını kontrol et
+    let tableExists = false;
+    try {
+      const checkTable = await sql`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = 'student_failed_courses'
+        )
+      `;
+      tableExists = checkTable[0]?.exists || false;
+    } catch (err) {
+      console.log("[getOfferingRegistrations] Tablo kontrolü hatası:", err.message);
+    }
+
     // Başvuruları getir
-    const registrations = await sql`
-      SELECT 
-        sr.id,
-        sr.status,
-        sr.application_note,
-        sr.rejection_reason,
-        sr.application_date,
-        sr.status_updated_at,
-        u.first_name,
-        u.last_name,
-        u.email,
-        s.student_number,
-        sfc.course_name as failed_course_name,
-        sfc.course_code as failed_course_code
-      FROM summer_school_registrations sr
-      JOIN students s ON sr.student_id = s.id
-      JOIN users u ON s.user_id = u.id
-      LEFT JOIN student_failed_courses sfc ON sr.failed_course_id = sfc.id
-      WHERE sr.offering_id = ${offeringId}
-      ORDER BY sr.application_date DESC
-    `;
+    let registrations;
+    if (tableExists) {
+      registrations = await sql`
+        SELECT 
+          sr.id,
+          sr.status,
+          sr.application_note,
+          sr.rejection_reason,
+          sr.application_date,
+          sr.status_updated_at,
+          sr.offering_id,
+          u.first_name,
+          u.last_name,
+          u.email,
+          s.student_number,
+          sfc.course_name as failed_course_name,
+          sfc.course_code as failed_course_code
+        FROM summer_school_registrations sr
+        JOIN students s ON sr.student_id = s.id
+        JOIN users u ON s.user_id = u.id
+        LEFT JOIN student_failed_courses sfc ON sr.failed_course_id = sfc.id
+        WHERE sr.offering_id = ${offeringId}
+        ORDER BY sr.application_date DESC
+      `;
+    } else {
+      // Tablo yoksa LEFT JOIN olmadan getir
+      registrations = await sql`
+        SELECT 
+          sr.id,
+          sr.status,
+          sr.application_note,
+          sr.rejection_reason,
+          sr.application_date,
+          sr.status_updated_at,
+          sr.offering_id,
+          u.first_name,
+          u.last_name,
+          u.email,
+          s.student_number,
+          NULL as failed_course_name,
+          NULL as failed_course_code
+        FROM summer_school_registrations sr
+        JOIN students s ON sr.student_id = s.id
+        JOIN users u ON s.user_id = u.id
+        WHERE sr.offering_id = ${offeringId}
+        ORDER BY sr.application_date DESC
+      `;
+    }
+
+    console.log(`[getOfferingRegistrations] ${registrations.length} başvuru bulundu`);
 
     res.json({
       success: true,
@@ -312,9 +442,12 @@ exports.getOfferingRegistrations = async (req, res) => {
     });
   } catch (error) {
     console.error("Başvurular listeleme hatası:", error);
+    console.error("Hata detayı:", error.message);
+    console.error("Stack trace:", error.stack);
     res.status(500).json({
       success: false,
       message: "Başvurular alınırken bir hata oluştu",
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 };
@@ -379,9 +512,19 @@ exports.updateRegistrationStatus = async (req, res) => {
       RETURNING *
     `;
 
+    // Başvuru onaylandığında current_registrations sayısını artır
+    if (status === "approved") {
+      await sql`
+        UPDATE summer_school_offerings
+        SET current_registrations = current_registrations + 1
+        WHERE id = ${registration[0].offering_id}
+      `;
+    }
+    // Reddedildiğinde bir şey yapmıyoruz çünkü zaten pending durumundaydı
+
     res.json({
       success: true,
-      message: status === "approved" ? "Başvuru onaylandı" : "Başvuru reddedildi",
+      message: status === "approved" ? "Başvuru onaylandı ve öğrenci derse eklendi" : "Başvuru reddedildi",
       data: updated[0],
     });
   } catch (error) {

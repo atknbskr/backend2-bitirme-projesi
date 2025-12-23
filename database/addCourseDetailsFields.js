@@ -69,3 +69,5 @@ async function addCourseDetailsFields() {
 addCourseDetailsFields();
 
 
+
+

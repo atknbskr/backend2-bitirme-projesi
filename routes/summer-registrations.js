@@ -27,7 +27,7 @@ router.post(
   [
     body("offeringId").notEmpty().isInt().withMessage("Teklif ID gerekli"),
     body("failedCourseId").optional().isInt(),
-    body("applicationNote").optional().isString(),
+    // applicationNote için validation kaldırıldı - controller'da null kontrolü yapılıyor
   ],
   validate,
   summerRegistrationController.createRegistration

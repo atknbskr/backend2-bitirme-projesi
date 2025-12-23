@@ -1,48 +1,108 @@
 const sql = require("../config/db");
 
-// Tüm dersleri listele
+// Tüm dersleri listele (summer_school_offerings tablosundan)
 exports.getAllCourses = async (req, res) => {
   try {
+    console.log('📚 Tüm dersler listeleniyor (summer_school_offerings)...');
+    console.log('Request user:', req.user || 'Herkese açık');
+    
+    // Önce summer_school_offerings tablosunun var olup olmadığını kontrol et
+    try {
+      const tableCheck = await sql`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = 'summer_school_offerings'
+        )
+      `;
+      
+      if (!tableCheck[0].exists) {
+        console.error('❌ summer_school_offerings tablosu bulunamadı!');
+        return res.status(500).json({
+          success: false,
+          message: "summer_school_offerings tablosu bulunamadı. Veritabanı şemasını kontrol edin.",
+        });
+      }
+    } catch (tableError) {
+      console.error('❌ Tablo kontrolü hatası:', tableError.message);
+    }
+    
+    // SQL sorgusunu çalıştır - summer_school_offerings tablosundan
     const courses = await sql`
       SELECT 
-        c.id,
-        c.course_name,
-        c.course_code,
-        c.description,
-        c.category,
-        c.academician_id,
-        c.university_count,
-        c.student_count,
-        c.application_deadline,
-        c.start_date,
-        c.end_date,
-        c.created_at,
-        u.first_name || ' ' || u.last_name as academician_name,
+        so.id,
+        so.course_name,
+        so.course_code,
+        so.description,
+        NULL as category,
+        so.academician_id,
+        0 as university_count,
+        COALESCE(so.current_registrations, 0) as student_count,
+        so.application_deadline,
+        so.start_date,
+        so.end_date,
+        so.created_at,
+        COALESCE(u.first_name || ' ' || u.last_name, 'Belirtilmemiş') as academician_name,
+        so.price,
+        so.credits,
+        so.course_hours,
+        so.quota,
+        COALESCE(so.language, 'turkish') as language,
+        so.equivalency_info,
+        so.requirements,
         CASE 
-          WHEN c.application_deadline >= CURRENT_DATE THEN true
+          WHEN so.is_active = true AND (so.application_deadline IS NULL OR so.application_deadline >= CURRENT_DATE) THEN true
           ELSE false
         END as is_active
-      FROM courses c
-      LEFT JOIN academicians a ON c.academician_id = a.id
+      FROM summer_school_offerings so
+      LEFT JOIN academicians a ON so.academician_id = a.id
       LEFT JOIN users u ON a.user_id = u.id
-      WHERE c.application_deadline IS NULL OR c.application_deadline >= CURRENT_DATE
-      ORDER BY c.created_at DESC
+      WHERE so.is_active = true
+        AND (so.application_deadline IS NULL OR so.application_deadline >= CURRENT_DATE)
+      ORDER BY so.created_at DESC
     `;
+
+    console.log('✅ Bulunan ders sayısı:', courses.length);
+    if (courses.length > 0) {
+      console.log('İlk ders örneği:', {
+        id: courses[0].id,
+        name: courses[0].course_name,
+        deadline: courses[0].application_deadline,
+        academician: courses[0].academician_name
+      });
+    } else {
+      console.log('⚠️ Hiç ders bulunamadı (bu normal olabilir)');
+    }
 
     res.json({
       success: true,
       courses: courses,
     });
   } catch (error) {
-    console.error("Ders listeleme hatası:", error);
+    console.error("❌ Ders listeleme hatası:", error);
+    console.error("Hata detayı:", error.message);
+    console.error("Hata kodu:", error.code);
+    console.error("Stack trace:", error.stack);
+    
+    // Daha açıklayıcı hata mesajı
+    let errorMessage = "Dersler alınırken bir hata oluştu";
+    if (error.message) {
+      errorMessage += `: ${error.message}`;
+    }
+    
     res.status(500).json({
       success: false,
-      message: "Dersler alınırken bir hata oluştu",
+      message: errorMessage,
+      error: process.env.NODE_ENV === 'development' ? {
+        message: error.message,
+        code: error.code,
+        detail: error.detail
+      } : undefined
     });
   }
 };
 
-// Akademisyenin derslerini listele
+// Akademisyenin derslerini listele (summer_school_offerings tablosundan)
 exports.getMyCourses = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -59,29 +119,38 @@ exports.getMyCourses = async (req, res) => {
       });
     }
 
-    // Sadece kendi üniversitesindeki ve kendine ait dersleri listele
+    // Sadece kendine ait dersleri listele (summer_school_offerings tablosundan)
     const courses = await sql`
       SELECT 
-        id,
-        course_name,
-        course_code,
-        description,
-        category,
-        university_count,
-        student_count,
-        application_deadline,
-        start_date,
-        end_date,
-        created_at,
+        so.id,
+        so.course_name,
+        so.course_code,
+        so.description,
+        NULL as category,
+        0 as university_count,
+        COALESCE(so.current_registrations, 0) as student_count,
+        so.application_deadline,
+        so.start_date,
+        so.end_date,
+        so.created_at,
+        so.price,
+        so.credits,
+        so.course_hours,
+        so.quota,
+        COALESCE(so.language, 'turkish') as language,
+        so.equivalency_info,
+        so.requirements,
         CASE 
-          WHEN application_deadline >= CURRENT_DATE THEN true
+          WHEN so.is_active = true AND (so.application_deadline IS NULL OR so.application_deadline >= CURRENT_DATE) THEN true
           ELSE false
         END as is_active
-      FROM courses
-      WHERE academician_id = ${academician[0].id}
-        AND (university_id = ${academician[0].university_id} OR university_id IS NULL)
-      ORDER BY created_at DESC
+      FROM summer_school_offerings so
+      WHERE so.academician_id = ${academician[0].id}
+        AND so.is_active = true
+      ORDER BY so.created_at DESC
     `;
+
+    console.log(`✅ Akademisyen ${academician[0].id} için ${courses.length} ders bulundu`);
 
     res.json({
       success: true,
@@ -92,6 +161,7 @@ exports.getMyCourses = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Dersler alınırken bir hata oluştu",
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -101,7 +171,7 @@ exports.createCourse = async (req, res) => {
   try {
     const userId = req.user.id;
     const userType = req.user.userType;
-    const { courseName, courseCode, description, category, academicianId, applicationDeadline, startDate, endDate } = req.body;
+    const { courseName, courseCode, description, category, academicianId, applicationDeadline, startDate, endDate, price, quota, language } = req.body;
 
     if (!courseName || courseName.trim() === '') {
       return res.status(400).json({
@@ -154,8 +224,8 @@ exports.createCourse = async (req, res) => {
 
     // Ders oluştur
     const newCourse = await sql`
-      INSERT INTO courses (academician_id, course_name, course_code, description, category, university_id, application_deadline, start_date, end_date)
-      VALUES (${finalAcademicianId}, ${courseName}, ${courseCode || null}, ${description || null}, ${category || null}, ${finalUniversityId}, ${applicationDeadline || null}, ${startDate || null}, ${endDate || null})
+      INSERT INTO courses (academician_id, course_name, course_code, description, category, university_id, application_deadline, start_date, end_date, price, quota, language)
+      VALUES (${finalAcademicianId}, ${courseName}, ${courseCode || null}, ${description || null}, ${category || null}, ${finalUniversityId}, ${applicationDeadline || null}, ${startDate || null}, ${endDate || null}, ${price || 0}, ${quota || 30}, ${language || 'turkish'})
       RETURNING *
     `;
 
@@ -321,26 +391,27 @@ exports.getCourseDetails = async (req, res) => {
   try {
     const courseId = req.params.id;
 
-    // Ders bilgilerini akademisyen detayları ile getir
+    // Ders bilgilerini akademisyen detayları ile getir (summer_school_offerings tablosundan)
     const course = await sql`
       SELECT 
-        c.id,
-        c.course_name,
-        c.course_code,
-        c.description,
-        c.category,
-        c.credits,
-        c.price,
-        c.course_hours,
-        c.quota,
-        c.requirements,
-        c.equivalency_info,
-        c.university_count,
-        c.student_count,
-        c.application_deadline,
-        c.start_date,
-        c.end_date,
-        c.created_at,
+        so.id,
+        so.course_name,
+        so.course_code,
+        so.description,
+        NULL as category,
+        so.credits,
+        so.price,
+        so.course_hours,
+        so.quota,
+        COALESCE(so.language, 'turkish') as language,
+        so.requirements,
+        so.equivalency_info,
+        0 as university_count,
+        COALESCE(so.current_registrations, 0) as student_count,
+        so.application_deadline,
+        so.start_date,
+        so.end_date,
+        so.created_at,
         a.id as academician_id,
         a.username as academician_username,
         a.title as academician_title,
@@ -350,10 +421,10 @@ exports.getCourseDetails = async (req, res) => {
         u.first_name as academician_first_name,
         u.last_name as academician_last_name,
         u.email as academician_email
-      FROM courses c
-      LEFT JOIN academicians a ON c.academician_id = a.id
+      FROM summer_school_offerings so
+      LEFT JOIN academicians a ON so.academician_id = a.id
       LEFT JOIN users u ON a.user_id = u.id
-      WHERE c.id = ${courseId}
+      WHERE so.id = ${courseId} AND so.is_active = true
     `;
 
     if (course.length === 0) {
@@ -408,7 +479,7 @@ exports.updateCourse = async (req, res) => {
     const userId = req.user.id;
     const userType = req.user.userType;
     const courseId = req.params.id;
-    const { courseName, courseCode, description, category, academicianId, applicationDeadline, startDate, endDate } = req.body;
+    const { courseName, courseCode, description, category, academicianId, applicationDeadline, startDate, endDate, price, quota, language } = req.body;
 
     // Ders var mı kontrol et
     const existingCourse = await sql`SELECT * FROM courses WHERE id = ${courseId}`;
@@ -478,7 +549,10 @@ exports.updateCourse = async (req, res) => {
         university_id = ${finalUniversityId},
         application_deadline = COALESCE(${applicationDeadline}, application_deadline),
         start_date = COALESCE(${startDate}, start_date),
-        end_date = COALESCE(${endDate}, end_date)
+        end_date = COALESCE(${endDate}, end_date),
+        price = COALESCE(${price}, price),
+        quota = COALESCE(${quota}, quota),
+        language = COALESCE(${language}, language)
       WHERE id = ${courseId}
     `;
 

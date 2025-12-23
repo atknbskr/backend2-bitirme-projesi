@@ -25,3 +25,5 @@ LIMIT 20;
 -- 4. Fakülteleri listele
 SELECT id, name, university_id FROM faculties ORDER BY name;
 
+
+

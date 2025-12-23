@@ -228,10 +228,13 @@ exports.getMyOfferings = async (req, res) => {
         u.name as university_name,
         u.city as university_city,
         f.name as faculty_name,
+        usr.first_name || ' ' || usr.last_name as academician_name,
         (so.quota - so.current_registrations) as available_slots
       FROM summer_school_offerings so
       LEFT JOIN universities u ON so.university_id = u.id
       LEFT JOIN faculties f ON so.faculty_id = f.id
+      LEFT JOIN academicians a ON so.academician_id = a.id
+      LEFT JOIN users usr ON a.user_id = usr.id
       WHERE so.academician_id = ${academician[0].id}
       ORDER BY so.created_at DESC
     `;
@@ -268,15 +271,16 @@ exports.createOffering = async (req, res) => {
       applicationDeadline,
       price,
       quota,
+      language,
       equivalencyInfo,
       requirements,
     } = req.body;
 
     // Validasyon
-    if (!courseName || !courseCode || !universityId) {
+    if (!courseName || !courseCode) {
       return res.status(400).json({
         success: false,
-        message: "Ders adı, ders kodu ve üniversite gereklidir",
+        message: "Ders adı ve ders kodu gereklidir",
       });
     }
 
@@ -299,6 +303,16 @@ exports.createOffering = async (req, res) => {
       });
     }
 
+    // Eğer universityId gönderilmemişse, akademisyenin university_id'sini kullan
+    const finalUniversityId = universityId || academician[0].university_id;
+    
+    if (!finalUniversityId) {
+      return res.status(400).json({
+        success: false,
+        message: "Üniversite bilgisi gereklidir. Lütfen profil ayarlarınızdan üniversitenizi seçin.",
+      });
+    }
+
     // Yeni teklif oluştur
     const newOffering = await sql`
       INSERT INTO summer_school_offerings (
@@ -317,12 +331,13 @@ exports.createOffering = async (req, res) => {
         application_deadline,
         price,
         quota,
+        language,
         equivalency_info,
         requirements
       )
       VALUES (
         ${courseId || null},
-        ${universityId},
+        ${finalUniversityId},
         ${facultyId || null},
         ${academician[0].id},
         ${courseName},
@@ -336,6 +351,7 @@ exports.createOffering = async (req, res) => {
         ${applicationDeadline},
         ${price || 0},
         ${quota || 30},
+        ${language || 'turkish'},
         ${equivalencyInfo || null},
         ${requirements || null}
       )
@@ -349,9 +365,20 @@ exports.createOffering = async (req, res) => {
     });
   } catch (error) {
     console.error("Yaz okulu teklifi oluşturma hatası:", error);
+    console.error("Hata detayı:", error.message);
+    console.error("Hata kodu:", error.code);
+    
+    // Veritabanı hatası kontrolü
+    let errorMessage = "Yaz okulu teklifi oluşturulurken bir hata oluştu";
+    if (error.code === '42703') {
+      errorMessage = "Veritabanı hatası: 'language' alanı bulunamadı. Lütfen addLanguageToSummerOfferings.sql dosyasını çalıştırın.";
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    
     res.status(500).json({
       success: false,
-      message: "Yaz okulu teklifi oluşturulurken bir hata oluştu",
+      message: errorMessage,
       error: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
@@ -403,6 +430,7 @@ exports.updateOffering = async (req, res) => {
         application_deadline = COALESCE(${updateData.applicationDeadline}, application_deadline),
         price = COALESCE(${updateData.price}, price),
         quota = COALESCE(${updateData.quota}, quota),
+        language = COALESCE(${updateData.language}, language),
         equivalency_info = COALESCE(${updateData.equivalencyInfo}, equivalency_info),
         requirements = COALESCE(${updateData.requirements}, requirements),
         is_active = COALESCE(${updateData.isActive}, is_active),
@@ -418,9 +446,21 @@ exports.updateOffering = async (req, res) => {
     });
   } catch (error) {
     console.error("Teklif güncelleme hatası:", error);
+    console.error("Hata detayı:", error.message);
+    console.error("Hata kodu:", error.code);
+    
+    // Veritabanı hatası kontrolü
+    let errorMessage = "Teklif güncellenirken bir hata oluştu";
+    if (error.code === '42703') {
+      errorMessage = "Veritabanı hatası: 'language' alanı bulunamadı. Lütfen addLanguageToSummerOfferings.sql dosyasını çalıştırın.";
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    
     res.status(500).json({
       success: false,
-      message: "Teklif güncellenirken bir hata oluştu",
+      message: errorMessage,
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
 };

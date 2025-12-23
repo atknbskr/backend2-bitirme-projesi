@@ -59,3 +59,5 @@ router.delete("/:id", academicianOrAdminAuth, announcementController.deleteAnnou
 
 module.exports = router;
 
+
+

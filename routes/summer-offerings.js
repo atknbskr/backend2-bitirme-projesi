@@ -21,11 +21,17 @@ const validate = (req, res, next) => {
 // Tüm yaz okulu tekliflerini listele (herkese açık - filtreleme ile)
 router.get("/", summerOfferingController.getAllOfferings);
 
-// Tek bir teklifi detaylı getir (herkese açık)
-router.get("/:id", summerOfferingController.getOfferingById);
-
-// Akademisyenin kendi tekliflerini listele
+// Akademisyenin kendi tekliflerini listele (/:id'den önce olmalı)
 router.get("/my/offerings", authMiddleware, summerOfferingController.getMyOfferings);
+
+// Akademisyen: Dersine kayıtlı öğrencileri listele (/:id'den önce olmalı)
+router.get("/:id/students", authMiddleware, summerOfferingController.getEnrolledStudents);
+
+// Akademisyen: Öğrenciyi dersten çıkar (/:id'den önce olmalı)
+router.delete("/:offeringId/students/:studentCourseId", authMiddleware, summerOfferingController.removeStudentFromCourse);
+
+// Tek bir teklifi detaylı getir (herkese açık - en sonda olmalı)
+router.get("/:id", summerOfferingController.getOfferingById);
 
 // Yeni teklif oluştur (sadece akademisyen)
 router.post(

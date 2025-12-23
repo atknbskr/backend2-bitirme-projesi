@@ -638,3 +638,173 @@ exports.deleteOffering = async (req, res) => {
   }
 };
 
+// Akademisyen: Dersine kayıtlı öğrencileri listele
+exports.getEnrolledStudents = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const offeringId = parseInt(req.params.id);
+
+    // Akademisyen ID'sini bul
+    const academician = await sql`
+      SELECT id FROM academicians WHERE user_id = ${userId}
+    `;
+
+    if (academician.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: "Bu işlem için akademisyen yetkisi gereklidir",
+      });
+    }
+
+    // Teklifin akademisyene ait olup olmadığını kontrol et
+    const offering = await sql`
+      SELECT id, course_name, course_code FROM summer_school_offerings
+      WHERE id = ${offeringId} AND academician_id = ${academician[0].id}
+    `;
+
+    if (offering.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Ders bulunamadı veya bu derse erişim yetkiniz yok",
+      });
+    }
+
+    // Derse kayıtlı öğrencileri getir (sadece aktif kayıtlar)
+    const enrolledStudents = await sql`
+      SELECT 
+        sc.id as student_course_id,
+        sc.student_id,
+        sc.status,
+        sc.enrolled_at,
+        u.id as user_id,
+        u.first_name,
+        u.last_name,
+        u.email,
+        s.student_number
+      FROM student_courses sc
+      INNER JOIN students s ON sc.student_id = s.id
+      INNER JOIN users u ON s.user_id = u.id
+      WHERE sc.summer_offering_id = ${offeringId}
+        AND sc.status = 'active'
+      ORDER BY sc.enrolled_at DESC
+    `;
+
+    res.json({
+      success: true,
+      data: enrolledStudents.map(student => ({
+        id: student.student_course_id,
+        studentId: student.student_id,
+        userId: student.user_id,
+        firstName: student.first_name,
+        lastName: student.last_name,
+        fullName: `${student.first_name} ${student.last_name}`,
+        email: student.email,
+        studentNumber: student.student_number,
+        status: student.status,
+        enrolledAt: student.enrolled_at
+      })),
+      course: {
+        id: offering[0].id,
+        courseName: offering[0].course_name,
+        courseCode: offering[0].course_code
+      }
+    });
+  } catch (error) {
+    console.error("Kayıtlı öğrenciler listeleme hatası:", error);
+    res.status(500).json({
+      success: false,
+      message: "Öğrenciler listelenirken bir hata oluştu",
+    });
+  }
+};
+
+// Akademisyen: Öğrenciyi dersten çıkar
+exports.removeStudentFromCourse = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const offeringId = parseInt(req.params.offeringId);
+    const studentCourseId = parseInt(req.params.studentCourseId);
+
+    // Akademisyen ID'sini bul
+    const academician = await sql`
+      SELECT id FROM academicians WHERE user_id = ${userId}
+    `;
+
+    if (academician.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: "Bu işlem için akademisyen yetkisi gereklidir",
+      });
+    }
+
+    // Teklifin akademisyene ait olup olmadığını kontrol et
+    const offering = await sql`
+      SELECT id, current_registrations FROM summer_school_offerings
+      WHERE id = ${offeringId} AND academician_id = ${academician[0].id}
+    `;
+
+    if (offering.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Ders bulunamadı veya bu derse erişim yetkiniz yok",
+      });
+    }
+
+    // Öğrenci kaydını kontrol et
+    const studentCourse = await sql`
+      SELECT id, student_id, status, registration_id, summer_offering_id
+      FROM student_courses
+      WHERE id = ${studentCourseId} AND summer_offering_id = ${offeringId}
+    `;
+
+    if (studentCourse.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Öğrenci kaydı bulunamadı",
+      });
+    }
+
+    if (studentCourse[0].status === "withdrawn") {
+      return res.status(400).json({
+        success: false,
+        message: "Bu öğrenci zaten dersten çıkarılmış",
+      });
+    }
+
+    // Öğrenciyi dersten çıkar
+    await sql`
+      UPDATE student_courses
+      SET status = 'withdrawn'
+      WHERE id = ${studentCourseId}
+    `;
+
+    // İlgili başvuruyu da iptal et
+    if (studentCourse[0].registration_id) {
+      await sql`
+        UPDATE summer_school_registrations
+        SET status = 'cancelled', status_updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${studentCourse[0].registration_id}
+      `;
+    }
+
+    // Summer offering'in current_registrations sayısını azalt
+    const newCount = Math.max(0, (offering[0].current_registrations || 0) - 1);
+    await sql`
+      UPDATE summer_school_offerings
+      SET current_registrations = ${newCount}
+      WHERE id = ${offeringId}
+    `;
+
+    res.json({
+      success: true,
+      message: "Öğrenci başarıyla dersten çıkarıldı",
+    });
+  } catch (error) {
+    console.error("Öğrenci çıkarma hatası:", error);
+    res.status(500).json({
+      success: false,
+      message: "Öğrenci çıkarılırken bir hata oluştu",
+    });
+  }
+};
+

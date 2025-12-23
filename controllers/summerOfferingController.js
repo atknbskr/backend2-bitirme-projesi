@@ -1,4 +1,5 @@
 const sql = require("../config/db");
+const notificationController = require("./notificationController");
 
 // Tüm yaz okulu tekliflerini listele (filtreleme ile)
 exports.getAllOfferings = async (req, res) => {
@@ -485,9 +486,9 @@ exports.updateOffering = async (req, res) => {
       });
     }
 
-    // Teklifin akademisyene ait olup olmadığını kontrol et
+    // Teklifin akademisyene ait olup olmadığını kontrol et ve mevcut linki al
     const offering = await sql`
-      SELECT id FROM summer_school_offerings
+      SELECT id, udemy_link, course_name, course_code FROM summer_school_offerings
       WHERE id = ${offeringId} AND academician_id = ${academician[0].id}
     `;
 
@@ -497,6 +498,10 @@ exports.updateOffering = async (req, res) => {
         message: "Teklif bulunamadı veya güncelleme yetkiniz yok",
       });
     }
+
+    const oldLink = offering[0].udemy_link;
+    const newLink = updateData.udemyLink || null;
+    const linkChanged = oldLink !== newLink && newLink !== null && newLink.trim() !== '';
 
     // Güncelleme
     const updated = await sql`
@@ -521,6 +526,40 @@ exports.updateOffering = async (req, res) => {
       WHERE id = ${offeringId}
       RETURNING *
     `;
+
+    // Eğer link eklendi veya güncellendiyse, kayıtlı öğrencilere bildirim gönder
+    if (linkChanged) {
+      try {
+        // Bu derse kayıtlı öğrencileri bul
+        const enrolledStudents = await sql`
+          SELECT DISTINCT s.user_id, u.first_name, u.last_name
+          FROM student_courses sc
+          JOIN students s ON sc.student_id = s.id
+          JOIN users u ON s.user_id = u.id
+          WHERE sc.summer_offering_id = ${offeringId}
+            AND sc.status = 'active'
+        `;
+        
+        console.log(`[updateOffering] ${enrolledStudents.length} öğrenciye bildirim gönderiliyor`);
+        
+        // Her öğrenciye bildirim gönder
+        for (const student of enrolledStudents) {
+          await notificationController.createNotification(
+            student.user_id,
+            'course_link_added',
+            '🔗 Ders Linki Eklendi!',
+            `${offering[0].course_name}${offering[0].course_code ? ' (' + offering[0].course_code + ')' : ''} dersinize link eklendi. Ders içeriğine erişmek için anasayfanızdaki "Kayıtlı Olduğum Dersler" bölümünden linke tıklayabilirsiniz.`,
+            offeringId,
+            'offering'
+          );
+        }
+        
+        console.log(`[updateOffering] Bildirimler başarıyla gönderildi`);
+      } catch (notifError) {
+        console.error('[updateOffering] Bildirim gönderme hatası:', notifError);
+        // Bildirim hatası olsa bile güncelleme devam etsin
+      }
+    }
 
     res.json({
       success: true,

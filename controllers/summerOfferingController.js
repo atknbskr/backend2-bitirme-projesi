@@ -123,6 +123,8 @@ exports.getAllOfferings = async (req, res) => {
           so.is_active,
           so.udemy_link,
           so.created_at,
+          so.university_id,
+          so.faculty_id,
           u.name as university_name,
           u.city as university_city,
           u.type as university_type,
@@ -142,18 +144,73 @@ exports.getAllOfferings = async (req, res) => {
       
       // JavaScript'te filtrele
       offerings = allOfferings.filter(offering => {
-        if (universityId && offering.university_id !== parseInt(universityId)) return false;
-        if (facultyId && offering.faculty_id !== parseInt(facultyId)) return false;
+        // Üniversite filtresi
+        if (universityId) {
+          const offeringUniId = offering.university_id ? parseInt(offering.university_id) : null;
+          const filterUniId = parseInt(universityId);
+          if (offeringUniId !== filterUniId) return false;
+        }
+        
+        // Fakülte filtresi
+        if (facultyId) {
+          const offeringFacId = offering.faculty_id ? parseInt(offering.faculty_id) : null;
+          const filterFacId = parseInt(facultyId);
+          if (offeringFacId !== filterFacId) return false;
+        }
+        
+        // Şehir filtresi
         if (city && offering.university_city !== city) return false;
-        if (minPrice && parseFloat(offering.price) < parseFloat(minPrice)) return false;
-        if (maxPrice && parseFloat(offering.price) > parseFloat(maxPrice)) return false;
-        if (startDate && new Date(offering.start_date) < new Date(startDate)) return false;
-        if (endDate && new Date(offering.end_date) > new Date(endDate)) return false;
-        if (applicationStartDate && new Date(offering.application_deadline) < new Date(applicationStartDate)) return false;
-        if (applicationEndDate && new Date(offering.application_deadline) > new Date(applicationEndDate)) return false;
-        if (hasAvailability === "true" && offering.available_slots <= 0) return false;
-        if (courseCode && !offering.course_code.toLowerCase().includes(courseCode.toLowerCase())) return false;
+        
+        // Fiyat filtreleri
+        const offeringPrice = offering.price ? parseFloat(offering.price) : 0;
+        if (minPrice) {
+          const minPriceNum = parseFloat(minPrice);
+          if (isNaN(minPriceNum) || offeringPrice < minPriceNum) return false;
+        }
+        if (maxPrice) {
+          const maxPriceNum = parseFloat(maxPrice);
+          if (isNaN(maxPriceNum) || offeringPrice > maxPriceNum) return false;
+        }
+        
+        // Ders başlangıç/bitiş tarihi filtreleri
+        if (startDate && offering.start_date) {
+          const offeringStartDate = new Date(offering.start_date);
+          const filterStartDate = new Date(startDate);
+          if (offeringStartDate < filterStartDate) return false;
+        }
+        if (endDate && offering.end_date) {
+          const offeringEndDate = new Date(offering.end_date);
+          const filterEndDate = new Date(endDate);
+          if (offeringEndDate > filterEndDate) return false;
+        }
+        
+        // Başvuru tarihi filtreleri
+        if (applicationStartDate && offering.application_start_date) {
+          const offeringAppStartDate = new Date(offering.application_start_date);
+          const filterAppStartDate = new Date(applicationStartDate);
+          if (offeringAppStartDate < filterAppStartDate) return false;
+        }
+        if (applicationEndDate && offering.application_deadline) {
+          const offeringAppEndDate = new Date(offering.application_deadline);
+          const filterAppEndDate = new Date(applicationEndDate);
+          if (offeringAppEndDate > filterAppEndDate) return false;
+        }
+        
+        // Kontenjan filtresi
+        if (hasAvailability === "true") {
+          const availableSlots = offering.available_slots ? parseInt(offering.available_slots) : 0;
+          if (availableSlots <= 0) return false;
+        }
+        
+        // Ders kodu filtresi
+        if (courseCode && offering.course_code) {
+          if (!offering.course_code.toLowerCase().includes(courseCode.toLowerCase())) return false;
+        }
+        
+        // Dil filtresi
         if (language && offering.language !== language) return false;
+        
+        // Arama filtresi
         if (search) {
           const searchLower = search.toLowerCase();
           const matchesName = offering.course_name?.toLowerCase().includes(searchLower);
@@ -161,6 +218,7 @@ exports.getAllOfferings = async (req, res) => {
           const matchesDesc = offering.description?.toLowerCase().includes(searchLower);
           if (!matchesName && !matchesCode && !matchesDesc) return false;
         }
+        
         return true;
       });
     }

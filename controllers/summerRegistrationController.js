@@ -17,7 +17,6 @@ exports.getMyRegistrations = async (req, res) => {
       });
     }
 
-<<<<<<< HEAD
     // Önce student_failed_courses tablosunun var olup olmadığını kontrol et
     let tableExists = false;
     try {
@@ -98,35 +97,6 @@ exports.getMyRegistrations = async (req, res) => {
         ORDER BY sr.application_date DESC
       `;
     }
-=======
-    const registrations = await sql`
-      SELECT 
-        sr.id,
-        sr.status,
-        sr.application_note,
-        sr.rejection_reason,
-        sr.application_date,
-        sr.status_updated_at,
-        so.id as offering_id,
-        so.course_name,
-        so.course_code,
-        so.start_date,
-        so.end_date,
-        so.application_deadline,
-        so.price,
-        so.quota,
-        so.current_registrations,
-        u.name as university_name,
-        u.city as university_city,
-        f.name as faculty_name
-      FROM summer_school_registrations sr
-      LEFT JOIN summer_school_offerings so ON sr.offering_id = so.id
-      LEFT JOIN universities u ON so.university_id = u.id
-      LEFT JOIN faculties f ON so.faculty_id = f.id
-      WHERE sr.student_id = ${student[0].id}
-      ORDER BY sr.application_date DESC
-    `;
->>>>>>> 74d3dcc299c21998626159701ff10595da41219e
 
     res.json({
       success: true,
@@ -307,11 +277,7 @@ exports.createRegistration = async (req, res) => {
 
     res.status(201).json({
       success: true,
-<<<<<<< HEAD
       message: "Başvurunuz başarıyla alındı. Akademisyen onayı bekleniyor.",
-=======
-      message: "Başvurunuz başarıyla alındı ve derslerinize eklendi",
->>>>>>> 74d3dcc299c21998626159701ff10595da41219e
       data: newRegistration[0],
     });
   } catch (error) {
@@ -471,7 +437,6 @@ exports.getOfferingRegistrations = async (req, res) => {
     }
 
     // Başvuruları getir
-<<<<<<< HEAD
     let registrations;
     if (tableExists) {
       registrations = await sql`
@@ -522,26 +487,6 @@ exports.getOfferingRegistrations = async (req, res) => {
     }
 
     console.log(`[getOfferingRegistrations] ${registrations.length} başvuru bulundu`);
-=======
-    const registrations = await sql`
-      SELECT 
-        sr.id,
-        sr.status,
-        sr.application_note,
-        sr.rejection_reason,
-        sr.application_date,
-        sr.status_updated_at,
-        u.first_name,
-        u.last_name,
-        u.email,
-        s.student_number
-      FROM summer_school_registrations sr
-      JOIN students s ON sr.student_id = s.id
-      JOIN users u ON s.user_id = u.id
-      WHERE sr.offering_id = ${offeringId}
-      ORDER BY sr.application_date DESC
-    `;
->>>>>>> 74d3dcc299c21998626159701ff10595da41219e
 
     res.json({
       success: true,
@@ -621,23 +566,16 @@ exports.updateRegistrationStatus = async (req, res) => {
       RETURNING *
     `;
 
-<<<<<<< HEAD
-    // Başvuru onaylandığında current_registrations sayısını artır
+    // Başvuru onaylandığında hem current_registrations sayısını artır hem de öğrencinin derslerine ekle
     if (status === "approved") {
+      // current_registrations sayısını artır
       await sql`
         UPDATE summer_school_offerings
         SET current_registrations = current_registrations + 1
         WHERE id = ${registration[0].offering_id}
       `;
-    }
-    // Reddedildiğinde bir şey yapmıyoruz çünkü zaten pending durumundaydı
 
-    res.json({
-      success: true,
-      message: status === "approved" ? "Başvuru onaylandı ve öğrenci derse eklendi" : "Başvuru reddedildi",
-=======
-    // Eğer onaylandıysa, öğrencinin derslerine ekle
-    if (status === "approved") {
+      // Öğrencinin derslerine ekle
       try {
         // Başvuru bilgilerini al
         const registrationDetails = await sql`
@@ -692,11 +630,11 @@ exports.updateRegistrationStatus = async (req, res) => {
         // Hata olsa bile başvuru onayı devam etsin
       }
     }
+    // Reddedildiğinde bir şey yapmıyoruz çünkü zaten pending durumundaydı
 
     res.json({
       success: true,
-      message: status === "approved" ? "Başvuru onaylandı ve ders kaydınıza eklendi" : "Başvuru reddedildi",
->>>>>>> 74d3dcc299c21998626159701ff10595da41219e
+      message: status === "approved" ? "Başvuru onaylandı ve öğrenci derse eklendi" : "Başvuru reddedildi",
       data: updated[0],
     });
   } catch (error) {

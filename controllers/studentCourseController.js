@@ -44,6 +44,7 @@ exports.getMyEnrolledCourses = async (req, res) => {
 
     res.json({
       success: true,
+      courses: courses,
       data: courses,
       count: courses.length,
     });

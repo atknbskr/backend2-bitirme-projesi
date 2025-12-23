@@ -22,3 +22,6 @@ CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(type);
 
 SELECT 'Bildirimler tablosu başarıyla oluşturuldu!' as mesaj;
 
+
+
+

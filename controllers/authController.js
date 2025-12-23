@@ -367,6 +367,7 @@ exports.updateProfile = async (req, res) => {
       firstName, 
       lastName, 
       email,
+      username,
       currentPassword,
       newPassword
     } = req.body;
@@ -423,9 +424,45 @@ exports.updateProfile = async (req, res) => {
 
     // Akademisyen ise ek bilgileri güncelle
     if (req.user.userType === "academician") {
-      // Akademisyenler için sadece var olan kolonları güncelle
-      // title, office, department gibi alanlar academicians tablosunda yoksa kaldırılabilir
-      // Şimdilik sadece temel kullanıcı bilgileri güncellenecek
+      // Kullanıcı adı güncellemesi
+      if (req.body.username) {
+        const username = req.body.username.trim();
+        
+        // Kullanıcı adı kontrolü
+        if (username.length < 3) {
+          return res.status(400).json({
+            success: false,
+            message: "Kullanıcı adı en az 3 karakter olmalıdır",
+          });
+        }
+        
+        if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+          return res.status(400).json({
+            success: false,
+            message: "Kullanıcı adı sadece harf, rakam ve alt çizgi içerebilir",
+          });
+        }
+        
+        // Kullanıcı adı başka bir akademisyen tarafından kullanılıyor mu?
+        const existingAcademician = await sql`
+          SELECT id FROM academicians 
+          WHERE username = ${username} AND user_id != ${userId}
+        `;
+        
+        if (existingAcademician.length > 0) {
+          return res.status(400).json({
+            success: false,
+            message: "Bu kullanıcı adı başka bir akademisyen tarafından kullanılıyor",
+          });
+        }
+        
+        // Kullanıcı adını güncelle
+        await sql`
+          UPDATE academicians
+          SET username = ${username}
+          WHERE user_id = ${userId}
+        `;
+      }
 
       // Güncellenmiş kullanıcı bilgilerini getir
       const updatedUser = await sql`

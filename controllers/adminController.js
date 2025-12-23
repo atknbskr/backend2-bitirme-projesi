@@ -234,6 +234,32 @@ exports.getStatistics = async (req, res) => {
   }
 };
 
+// Public istatistikler (Herkese açık - sadece öğrenci, akademisyen ve üniversite sayıları)
+exports.getPublicStatistics = async (req, res) => {
+  try {
+    const [students, academicians, universities] = await Promise.all([
+      sql`SELECT COUNT(*) as count FROM students`,
+      sql`SELECT COUNT(*) as count FROM academicians`,
+      sql`SELECT COUNT(*) as count FROM universities`.catch(() => [{ count: 0 }]),
+    ]);
+
+    res.json({
+      success: true,
+      statistics: {
+        students: parseInt(students[0].count),
+        academicians: parseInt(academicians[0].count),
+        universities: parseInt(universities[0].count),
+      },
+    });
+  } catch (error) {
+    console.error("Public istatistik hatası:", error);
+    res.status(500).json({
+      success: false,
+      message: "İstatistikler alınırken bir hata oluştu",
+    });
+  }
+};
+
 // Kullanıcı bilgilerini güncelle (Admin)
 exports.updateUser = async (req, res) => {
   try {
@@ -334,10 +360,11 @@ exports.getAllUniversities = async (req, res) => {
         SELECT 
           u.*,
           COUNT(DISTINCT a.id) as academician_count,
-          COALESCE(SUM(so.current_registrations), 0) as student_count
+          COALESCE(COUNT(DISTINCT sc.student_id), 0) as student_count
         FROM universities u
         LEFT JOIN academicians a ON u.id = a.university_id
         LEFT JOIN summer_school_offerings so ON u.id = so.university_id AND so.is_active = true
+        LEFT JOIN student_courses sc ON sc.summer_offering_id = so.id AND sc.status = 'active'
         WHERE 1=1
           ${city ? sql`AND u.city = ${city}` : sql``}
           ${type ? sql`AND u.type = ${type}` : sql``}
@@ -349,10 +376,11 @@ exports.getAllUniversities = async (req, res) => {
         SELECT 
           u.*,
           COUNT(DISTINCT a.id) as academician_count,
-          COALESCE(SUM(so.current_registrations), 0) as student_count
+          COALESCE(COUNT(DISTINCT sc.student_id), 0) as student_count
         FROM universities u
         LEFT JOIN academicians a ON u.id = a.university_id
         LEFT JOIN summer_school_offerings so ON u.id = so.university_id AND so.is_active = true
+        LEFT JOIN student_courses sc ON sc.summer_offering_id = so.id AND sc.status = 'active'
         GROUP BY u.id
         ORDER BY u.name ASC
       `;

@@ -17,7 +17,7 @@ exports.getMyEnrolledCourses = async (req, res) => {
       });
     }
 
-    // Öğrencinin derslerini getir
+    // Öğrencinin derslerini getir (sadece aktif dersler - iptal edilenler hariç)
     const courses = await sql`
       SELECT 
         sc.id,
@@ -34,11 +34,15 @@ exports.getMyEnrolledCourses = async (req, res) => {
         so.end_date,
         so.price,
         so.udemy_link,
-        sr.status as registration_status
+        sr.status as registration_status,
+        COALESCE(u.first_name || ' ' || u.last_name, 'Belirtilmemiş') as academician_name
       FROM student_courses sc
       LEFT JOIN summer_school_offerings so ON sc.summer_offering_id = so.id
       LEFT JOIN summer_school_registrations sr ON sc.registration_id = sr.id
+      LEFT JOIN academicians a ON so.academician_id = a.id
+      LEFT JOIN users u ON a.user_id = u.id
       WHERE sc.student_id = ${student[0].id}
+        AND sc.status = 'active'
       ORDER BY sc.enrolled_at DESC
     `;
 
@@ -149,6 +153,22 @@ exports.withdrawFromCourse = async (req, res) => {
       });
     }
 
+    // Sadece aktif dersler iptal edilebilir
+    if (course[0].status !== "active") {
+      return res.status(400).json({
+        success: false,
+        message: "Sadece aktif dersler iptal edilebilir",
+      });
+    }
+
+    // Summer offering ID'sini al
+    const courseDetails = await sql`
+      SELECT sc.summer_offering_id, so.current_registrations
+      FROM student_courses sc
+      LEFT JOIN summer_school_offerings so ON sc.summer_offering_id = so.id
+      WHERE sc.id = ${courseId}
+    `;
+
     // Dersten çıkış yap
     await sql`
       UPDATE student_courses
@@ -162,6 +182,16 @@ exports.withdrawFromCourse = async (req, res) => {
         UPDATE summer_school_registrations
         SET status = 'cancelled', status_updated_at = CURRENT_TIMESTAMP
         WHERE id = ${course[0].registration_id}
+      `;
+    }
+
+    // Summer offering'in current_registrations sayısını azalt
+    if (courseDetails.length > 0 && courseDetails[0].summer_offering_id) {
+      const newCount = Math.max(0, (courseDetails[0].current_registrations || 0) - 1);
+      await sql`
+        UPDATE summer_school_offerings
+        SET current_registrations = ${newCount}
+        WHERE id = ${courseDetails[0].summer_offering_id}
       `;
     }
 

@@ -17,3 +17,6 @@ router.put("/read-all", authMiddleware, notificationController.markAllAsRead);
 
 module.exports = router;
 
+
+
+

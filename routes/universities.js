@@ -4,6 +4,9 @@ const { body, validationResult } = require("express-validator");
 const adminController = require("../controllers/adminController");
 const adminAuth = require("../middleware/adminAuth");
 
+// Public istatistikler (Herkese açık)
+router.get("/statistics", adminController.getPublicStatistics);
+
 // Validation middleware
 const validate = (req, res, next) => {
   const errors = validationResult(req);
@@ -16,6 +19,9 @@ const validate = (req, res, next) => {
   }
   next();
 };
+
+// Public istatistikler (Herkese açık) - /:id'den önce olmalı
+router.get("/statistics", adminController.getPublicStatistics);
 
 // Tüm üniversiteleri listele (Herkese açık)
 router.get("/", adminController.getAllUniversities);

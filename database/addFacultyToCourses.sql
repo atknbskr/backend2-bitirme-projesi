@@ -34,3 +34,4 @@ SELECT id, name, university_id FROM faculties ORDER BY name;
 
 
 
+

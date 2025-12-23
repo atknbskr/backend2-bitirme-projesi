@@ -35,7 +35,8 @@ exports.getMyEnrolledCourses = async (req, res) => {
         so.price,
         so.udemy_link,
         sr.status as registration_status,
-        COALESCE(u.first_name || ' ' || u.last_name, 'Belirtilmemiş') as academician_name
+        COALESCE(u.first_name || ' ' || u.last_name, 'Belirtilmemiş') as academician_name,
+        a.title as academician_title
       FROM student_courses sc
       LEFT JOIN summer_school_offerings so ON sc.summer_offering_id = so.id
       LEFT JOIN summer_school_registrations sr ON sc.registration_id = sr.id

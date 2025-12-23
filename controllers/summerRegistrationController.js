@@ -1,4 +1,5 @@
 const sql = require("../config/db");
+const notificationController = require("./notificationController");
 
 // Öğrencinin başvurularını listele
 exports.getMyRegistrations = async (req, res) => {
@@ -274,6 +275,37 @@ exports.createRegistration = async (req, res) => {
 
     // NOT: current_registrations sadece başvuru onaylandığında artırılacak
     // Başvuru yapıldığında artırılmaz, çünkü henüz onaylanmamıştır
+    
+    // Akademisyene bildirim gönder
+    try {
+      const offeringDetailsForNotif = await sql`
+        SELECT 
+          so.academician_id,
+          so.course_name,
+          so.course_code,
+          a.user_id as academician_user_id
+        FROM summer_school_offerings so
+        JOIN academicians a ON so.academician_id = a.id
+        WHERE so.id = ${offeringId}
+      `;
+      
+      if (offeringDetailsForNotif.length > 0 && offeringDetailsForNotif[0].academician_user_id) {
+        console.log(`[createRegistration] Akademisyene bildirim gönderiliyor - user_id: ${offeringDetailsForNotif[0].academician_user_id}`);
+        await notificationController.createNotification(
+          offeringDetailsForNotif[0].academician_user_id,
+          'new_application',
+          '📝 Yeni Başvuru',
+          `${offeringDetailsForNotif[0].course_name} (${offeringDetailsForNotif[0].course_code}) dersinize yeni bir başvuru yapıldı.`,
+          newRegistration[0].id,
+          'registration'
+        );
+        console.log(`[createRegistration] Akademisyen bildirimi başarıyla oluşturuldu`);
+      } else {
+        console.log(`[createRegistration] Akademisyen user_id bulunamadı`);
+      }
+    } catch (notifError) {
+      console.error('Akademisyen bildirimi oluşturma hatası:', notifError);
+    }
 
     // Öğrencinin derslerine ekle
     try {
@@ -690,12 +722,57 @@ exports.updateRegistrationStatus = async (req, res) => {
         `;
 
         console.log(`✅ Öğrenci ${regDetail.student_id} için ders ${regDetail.course_code} eklendi`);
+        
+        // Öğrenciye bildirim gönder
+        try {
+          const studentUser = await sql`
+            SELECT user_id FROM students WHERE id = ${regDetail.student_id}
+          `;
+          if (studentUser.length > 0) {
+            await notificationController.createNotification(
+              studentUser[0].user_id,
+              'application_approved',
+              '✅ Başvurunuz Onaylandı!',
+              `${regDetail.course_name} (${regDetail.course_code}) dersine yaptığınız başvuru onaylandı.`,
+              registrationId,
+              'registration'
+            );
+          }
+        } catch (notifError) {
+          console.error('Bildirim oluşturma hatası:', notifError);
+        }
       } catch (courseError) {
         console.error("Derse kayıt eklenirken hata:", courseError);
         // Hata olsa bile başvuru onayı devam etsin
       }
+    } else if (status === "rejected") {
+      // Başvuru reddedildiğinde öğrenciye bildirim gönder
+      try {
+        const registrationDetails = await sql`
+          SELECT 
+            s.user_id as student_user_id,
+            so.course_name,
+            so.course_code
+          FROM summer_school_registrations sr
+          JOIN summer_school_offerings so ON sr.offering_id = so.id
+          JOIN students s ON sr.student_id = s.id
+          WHERE sr.id = ${registrationId}
+        `;
+        
+        if (registrationDetails.length > 0) {
+          await notificationController.createNotification(
+            registrationDetails[0].student_user_id,
+            'application_rejected',
+            '❌ Başvurunuz Reddedildi',
+            `${registrationDetails[0].course_name} (${registrationDetails[0].course_code}) dersine yaptığınız başvuru reddedildi.${rejectionReason ? ' Sebep: ' + rejectionReason : ''}`,
+            registrationId,
+            'registration'
+          );
+        }
+      } catch (notifError) {
+        console.error('Bildirim oluşturma hatası:', notifError);
+      }
     }
-    // Reddedildiğinde bir şey yapmıyoruz çünkü zaten pending durumundaydı
 
     res.json({
       success: true,

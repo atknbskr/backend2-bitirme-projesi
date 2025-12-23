@@ -14,6 +14,7 @@ const summerRegistrationsRoutes = require("./routes/summer-registrations");
 const announcementRoutes = require("./routes/announcements");
 const courseApplicationsRoutes = require("./routes/course-applications");
 const studentCoursesRoutes = require("./routes/student-courses");
+const notificationRoutes = require("./routes/notifications");
 
 const app = express();
 const PORT = process.env.PORT || 5500;
@@ -47,6 +48,7 @@ app.use("/api/summer-registrations", summerRegistrationsRoutes);
 app.use("/api/announcements", announcementRoutes);
 app.use("/api/course-applications", courseApplicationsRoutes);
 app.use("/api/student-courses", studentCoursesRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // Health check
 app.get("/api/health", (req, res) => {

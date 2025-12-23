@@ -590,23 +590,45 @@ exports.updateCourse = async (req, res) => {
     }
 
     // Dersi güncelle
-    await sql`
-      UPDATE summer_school_offerings 
-      SET 
-        course_name = COALESCE(${courseName}, course_name),
-        course_code = COALESCE(${courseCode}, course_code),
-        description = COALESCE(${description}, description),
-        academician_id = ${finalAcademicianId},
-        university_id = ${finalUniversityId},
-        application_deadline = COALESCE(${applicationDeadline}, application_deadline),
-        start_date = COALESCE(${startDate}, start_date),
-        end_date = COALESCE(${endDate}, end_date),
-        price = COALESCE(${price}, price),
-        quota = COALESCE(${quota}, quota),
-        language = COALESCE(${language}, language),
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ${courseId}
-    `;
+    // Admin güncelleme yapıyorsa, is_active'i true yap (ders görünür olsun)
+    if (userType === 'admin') {
+      await sql`
+        UPDATE summer_school_offerings 
+        SET 
+          course_name = COALESCE(${courseName}, course_name),
+          course_code = COALESCE(${courseCode}, course_code),
+          description = COALESCE(${description}, description),
+          academician_id = ${finalAcademicianId},
+          university_id = ${finalUniversityId},
+          application_deadline = COALESCE(${applicationDeadline}, application_deadline),
+          start_date = COALESCE(${startDate}, start_date),
+          end_date = COALESCE(${endDate}, end_date),
+          price = COALESCE(${price}, price),
+          quota = COALESCE(${quota}, quota),
+          language = COALESCE(${language}, language),
+          is_active = true,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${courseId}
+      `;
+    } else {
+      await sql`
+        UPDATE summer_school_offerings 
+        SET 
+          course_name = COALESCE(${courseName}, course_name),
+          course_code = COALESCE(${courseCode}, course_code),
+          description = COALESCE(${description}, description),
+          academician_id = ${finalAcademicianId},
+          university_id = ${finalUniversityId},
+          application_deadline = COALESCE(${applicationDeadline}, application_deadline),
+          start_date = COALESCE(${startDate}, start_date),
+          end_date = COALESCE(${endDate}, end_date),
+          price = COALESCE(${price}, price),
+          quota = COALESCE(${quota}, quota),
+          language = COALESCE(${language}, language),
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${courseId}
+      `;
+    }
 
     res.json({
       success: true,

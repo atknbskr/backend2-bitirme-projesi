@@ -36,6 +36,7 @@ exports.getAllCourses = async (req, res) => {
         so.description,
         NULL as category,
         so.academician_id,
+        so.university_id,
         0 as university_count,
         COALESCE(so.current_registrations, 0) as student_count,
         so.application_deadline,
@@ -43,6 +44,8 @@ exports.getAllCourses = async (req, res) => {
         so.end_date,
         so.created_at,
         COALESCE(u.first_name || ' ' || u.last_name, 'Belirtilmemiş') as academician_name,
+        uni.name as university_name,
+        uni.city as university_city,
         so.price,
         so.credits,
         so.course_hours,
@@ -57,6 +60,7 @@ exports.getAllCourses = async (req, res) => {
       FROM summer_school_offerings so
       LEFT JOIN academicians a ON so.academician_id = a.id
       LEFT JOIN users u ON a.user_id = u.id
+      LEFT JOIN universities uni ON so.university_id = uni.id
       WHERE so.is_active = true
         AND (so.application_deadline IS NULL OR so.application_deadline >= CURRENT_DATE)
       ORDER BY so.created_at DESC
@@ -415,6 +419,7 @@ exports.getCourseDetails = async (req, res) => {
         COALESCE(so.language, 'turkish') as language,
         so.requirements,
         so.equivalency_info,
+        so.university_id,
         0 as university_count,
         COALESCE(so.current_registrations, 0) as student_count,
         so.application_deadline,
@@ -429,10 +434,13 @@ exports.getCourseDetails = async (req, res) => {
         a.department as academician_department,
         u.first_name as academician_first_name,
         u.last_name as academician_last_name,
-        u.email as academician_email
+        u.email as academician_email,
+        uni.name as university_name,
+        uni.city as university_city
       FROM summer_school_offerings so
       LEFT JOIN academicians a ON so.academician_id = a.id
       LEFT JOIN users u ON a.user_id = u.id
+      LEFT JOIN universities uni ON so.university_id = uni.id
       WHERE so.id = ${courseId} AND so.is_active = true
     `;
 
@@ -488,7 +496,7 @@ exports.updateCourse = async (req, res) => {
     const userId = req.user.id;
     const userType = req.user.userType;
     const courseId = req.params.id;
-    const { courseName, courseCode, description, category, academicianId, applicationDeadline, startDate, endDate, price, quota, language } = req.body;
+    const { courseName, courseCode, description, category, academicianId, universityId, applicationDeadline, startDate, endDate, price, quota, language } = req.body;
 
     // Ders var mı kontrol et
     const existingCourse = await sql`SELECT * FROM summer_school_offerings WHERE id = ${courseId}`;
@@ -504,11 +512,26 @@ exports.updateCourse = async (req, res) => {
 
     // Admin ise, tüm dersleri güncelleyebilir
     if (userType === 'admin') {
+      // Üniversite ID değiştiriliyorsa kontrol et
+      if (universityId !== undefined && universityId !== null && universityId !== '') {
+        const university = await sql`SELECT id FROM universities WHERE id = ${universityId}`;
+        if (university.length === 0) {
+          return res.status(400).json({
+            success: false,
+            message: "Geçersiz üniversite ID",
+          });
+        }
+        finalUniversityId = universityId;
+      }
+      
       // Akademisyen ID değiştiriliyorsa kontrol et
       if (academicianId !== undefined) {
         if (academicianId === null || academicianId === '') {
           finalAcademicianId = null;
-          finalUniversityId = null;
+          // Üniversite ID değiştirilmediyse null yap
+          if (universityId === undefined) {
+            finalUniversityId = null;
+          }
         } else {
           const academician = await sql`SELECT id, university_id FROM academicians WHERE id = ${academicianId}`;
           if (academician.length === 0) {
@@ -518,7 +541,10 @@ exports.updateCourse = async (req, res) => {
             });
           }
           finalAcademicianId = academicianId;
-          finalUniversityId = academician[0].university_id;
+          // Üniversite ID manuel olarak değiştirilmediyse akademisyenin üniversitesini kullan
+          if (universityId === undefined) {
+            finalUniversityId = academician[0].university_id;
+          }
         }
       }
     } else {
@@ -548,12 +574,11 @@ exports.updateCourse = async (req, res) => {
 
     // Dersi güncelle
     await sql`
-      UPDATE courses 
+      UPDATE summer_school_offerings 
       SET 
         course_name = COALESCE(${courseName}, course_name),
         course_code = COALESCE(${courseCode}, course_code),
         description = COALESCE(${description}, description),
-        category = COALESCE(${category}, category),
         academician_id = ${finalAcademicianId},
         university_id = ${finalUniversityId},
         application_deadline = COALESCE(${applicationDeadline}, application_deadline),
@@ -561,7 +586,8 @@ exports.updateCourse = async (req, res) => {
         end_date = COALESCE(${endDate}, end_date),
         price = COALESCE(${price}, price),
         quota = COALESCE(${quota}, quota),
-        language = COALESCE(${language}, language)
+        language = COALESCE(${language}, language),
+        updated_at = CURRENT_TIMESTAMP
       WHERE id = ${courseId}
     `;
 

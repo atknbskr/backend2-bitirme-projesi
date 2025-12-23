@@ -28,9 +28,10 @@ exports.applyToCourse = async (req, res) => {
         id,
         course_name,
         application_deadline,
-        academician_id
-      FROM courses
-      WHERE id = ${courseId}
+        academician_id,
+        is_active
+      FROM summer_school_offerings
+      WHERE id = ${courseId} AND is_active = true
     `;
 
     if (course.length === 0) {
@@ -140,18 +141,18 @@ exports.getMyApplications = async (req, res) => {
         cr.rejection_reason,
         cr.application_date,
         cr.status_updated_at,
-        c.id as course_id,
-        c.course_name,
-        c.course_code,
-        c.description,
-        c.category,
-        c.application_deadline,
-        c.start_date,
-        c.end_date,
+        so.id as course_id,
+        so.course_name,
+        so.course_code,
+        so.description,
+        NULL as category,
+        so.application_deadline,
+        so.start_date,
+        so.end_date,
         u.first_name || ' ' || u.last_name as academician_name
       FROM course_registrations cr
-      JOIN courses c ON cr.course_id = c.id
-      LEFT JOIN academicians a ON c.academician_id = a.id
+      JOIN summer_school_offerings so ON cr.course_id = so.id
+      LEFT JOIN academicians a ON so.academician_id = a.id
       LEFT JOIN users u ON a.user_id = u.id
       WHERE cr.student_id = ${student[0].id}
       ORDER BY cr.application_date DESC
@@ -190,7 +191,7 @@ exports.getCourseApplications = async (req, res) => {
 
     // Dersin akademisyene ait olup olmadığını kontrol et
     const course = await sql`
-      SELECT id, course_name FROM courses
+      SELECT id, course_name FROM summer_school_offerings
       WHERE id = ${courseId} AND academician_id = ${academician[0].id}
     `;
 
@@ -260,8 +261,8 @@ exports.getMyCoursesApplications = async (req, res) => {
         id,
         course_name,
         course_code
-      FROM courses
-      WHERE academician_id = ${academician[0].id}
+      FROM summer_school_offerings
+      WHERE academician_id = ${academician[0].id} AND is_active = true
       ORDER BY course_name
     `;
 
@@ -342,8 +343,8 @@ exports.updateApplicationStatus = async (req, res) => {
     const application = await sql`
       SELECT cr.id, cr.status, cr.course_id
       FROM course_registrations cr
-      JOIN courses c ON cr.course_id = c.id
-      WHERE cr.id = ${applicationId} AND c.academician_id = ${academician[0].id}
+      JOIN summer_school_offerings so ON cr.course_id = so.id
+      WHERE cr.id = ${applicationId} AND so.academician_id = ${academician[0].id}
     `;
 
     if (application.length === 0) {

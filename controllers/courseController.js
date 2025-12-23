@@ -264,7 +264,7 @@ exports.getCourseStudents = async (req, res) => {
 
     // Dersin akademisyene ait olup olmadığını kontrol et
     const course = await sql`
-      SELECT id, course_name FROM courses 
+      SELECT id, course_name FROM summer_school_offerings 
       WHERE id = ${courseId} AND academician_id = ${academician[0].id}
     `;
 
@@ -337,25 +337,23 @@ exports.getMyCoursesWithStudents = async (req, res) => {
     // Akademisyenin derslerini getir
     const courses = await sql`
       SELECT 
-        c.id,
-        c.course_name,
-        c.course_code,
-        c.description,
-        c.category,
-        c.university_count,
-        c.student_count,
-        c.application_deadline,
-        c.start_date,
-        c.end_date,
-        c.created_at,
-        CASE 
-          WHEN c.application_deadline >= CURRENT_DATE THEN true
-          ELSE false
-        END as is_active
-      FROM courses c
-      WHERE c.academician_id = ${academician[0].id}
-        AND (c.university_id = ${academician[0].university_id} OR c.university_id IS NULL)
-      ORDER BY c.created_at DESC
+        so.id,
+        so.course_name,
+        so.course_code,
+        so.description,
+        NULL as category,
+        0 as university_count,
+        COALESCE(so.current_registrations, 0) as student_count,
+        so.application_deadline,
+        so.start_date,
+        so.end_date,
+        so.created_at,
+        so.is_active
+      FROM summer_school_offerings so
+      WHERE so.academician_id = ${academician[0].id}
+        AND (so.university_id = ${academician[0].university_id} OR so.university_id IS NULL)
+        AND so.is_active = true
+      ORDER BY so.created_at DESC
     `;
 
     // Her ders için öğrencileri getir
@@ -493,7 +491,7 @@ exports.updateCourse = async (req, res) => {
     const { courseName, courseCode, description, category, academicianId, applicationDeadline, startDate, endDate, price, quota, language } = req.body;
 
     // Ders var mı kontrol et
-    const existingCourse = await sql`SELECT * FROM courses WHERE id = ${courseId}`;
+    const existingCourse = await sql`SELECT * FROM summer_school_offerings WHERE id = ${courseId}`;
     if (existingCourse.length === 0) {
       return res.status(404).json({
         success: false,
@@ -600,7 +598,7 @@ exports.getCourseApplications = async (req, res) => {
 
     // Dersin akademisyene ait olup olmadığını kontrol et
     const course = await sql`
-      SELECT id, course_name FROM courses 
+      SELECT id, course_name FROM summer_school_offerings 
       WHERE id = ${courseId} AND academician_id = ${academician[0].id}
     `;
 
@@ -683,8 +681,8 @@ exports.updateApplicationStatus = async (req, res) => {
     const favorite = await sql`
       SELECT f.id, f.course_id, f.status, f.student_id
       FROM favorites f
-      JOIN courses c ON f.course_id = c.id
-      WHERE f.id = ${favoriteId} AND c.academician_id = ${academician[0].id}
+      JOIN summer_school_offerings so ON f.course_id = so.id
+      WHERE f.id = ${favoriteId} AND so.academician_id = ${academician[0].id}
     `;
 
     if (favorite.length === 0) {
@@ -712,20 +710,9 @@ exports.updateApplicationStatus = async (req, res) => {
     // Eğer onaylandıysa, öğrenci sayısı zaten artırılmış olmalı (favorite eklendiğinde)
     // Ama reddedilirse, eğer daha önce approved ise sayıyı azalt
     const oldStatus = favorite[0].status;
-    if (oldStatus === "approved" && status === "rejected") {
-      await sql`
-        UPDATE courses 
-        SET student_count = GREATEST(student_count - 1, 0)
-        WHERE id = ${favorite[0].course_id}
-      `;
-    } else if (oldStatus === "pending" && status === "approved") {
-      // Pending'den approved'a geçerse, öğrenci sayısını artır
-      await sql`
-        UPDATE courses 
-        SET student_count = student_count + 1
-        WHERE id = ${favorite[0].course_id}
-      `;
-    }
+    // summer_school_offerings'de current_registrations kullanılıyor
+    // Favori durumu değiştiğinde current_registrations güncellenmez
+    // Çünkü bu sadece onaylanmış başvurular için kullanılıyor
 
     res.json({
       success: true,
@@ -749,7 +736,7 @@ exports.deleteCourse = async (req, res) => {
 
     // Admin ise, tüm dersleri silebilir
     if (userType === 'admin') {
-      const course = await sql`SELECT id FROM courses WHERE id = ${courseId}`;
+      const course = await sql`SELECT id FROM summer_school_offerings WHERE id = ${courseId}`;
       if (course.length === 0) {
         return res.status(404).json({
           success: false,
@@ -771,7 +758,7 @@ exports.deleteCourse = async (req, res) => {
 
       // Dersin sahibi ve üniversite kontrolü
       const course = await sql`
-        SELECT id FROM courses 
+        SELECT id FROM summer_school_offerings 
         WHERE id = ${courseId} 
           AND academician_id = ${academician[0].id}
           AND (university_id = ${academician[0].university_id} OR university_id IS NULL)
@@ -785,8 +772,12 @@ exports.deleteCourse = async (req, res) => {
       }
     }
 
-    // Dersi sil
-    await sql`DELETE FROM courses WHERE id = ${courseId}`;
+    // Dersi sil (soft delete - is_active = false yap)
+    await sql`
+      UPDATE summer_school_offerings 
+      SET is_active = false 
+      WHERE id = ${courseId}
+    `;
 
     res.json({
       success: true,

@@ -25,22 +25,26 @@ exports.getMyFavorites = async (req, res) => {
     const favorites = await sql`
       SELECT 
         f.id as favorite_id,
-        c.id,
-        c.course_name,
-        c.course_code,
-        c.description,
-        c.category,
-        c.university_count,
-        c.student_count,
-        c.application_deadline,
-        c.start_date,
-        c.end_date,
-        c.created_at,
+        so.id,
+        so.course_name,
+        so.course_code,
+        so.description,
+        NULL as category,
+        0 as university_count,
+        COALESCE(so.current_registrations, 0) as student_count,
+        so.application_deadline,
+        so.start_date,
+        so.end_date,
+        so.created_at,
         f.created_at as favorited_at,
-        COALESCE(u.first_name || ' ' || u.last_name, 'Belirtilmemiş') as academician_name
+        COALESCE(u.first_name || ' ' || u.last_name, 'Belirtilmemiş') as academician_name,
+        so.price,
+        so.credits,
+        so.quota,
+        so.is_active
       FROM favorites f
-      JOIN courses c ON f.course_id = c.id
-      LEFT JOIN academicians a ON c.academician_id = a.id
+      JOIN summer_school_offerings so ON f.course_id = so.id
+      LEFT JOIN academicians a ON so.academician_id = a.id
       LEFT JOIN users u ON a.user_id = u.id
       WHERE f.student_id = ${student[0].id}
       ORDER BY f.created_at DESC
@@ -83,7 +87,7 @@ exports.addFavorite = async (req, res) => {
 
     // Dersin var olup olmadığını kontrol et
     const course = await sql`
-      SELECT id FROM courses WHERE id = ${courseId}
+      SELECT id FROM summer_school_offerings WHERE id = ${courseId}
     `;
 
     if (course.length === 0) {
@@ -159,12 +163,8 @@ exports.removeFavorite = async (req, res) => {
       });
     }
 
-    // Öğrenci sayısını güncelle
-    await sql`
-      UPDATE courses 
-      SET student_count = GREATEST(student_count - 1, 0)
-      WHERE id = ${courseId}
-    `;
+    // Öğrenci sayısını güncelle (summer_school_offerings'de current_registrations kullanılıyor)
+    // Favori çıkarıldığında current_registrations azaltılmaz çünkü bu sadece onaylanmış başvurular için
 
     res.json({
       success: true,

@@ -209,7 +209,7 @@ exports.getStatistics = async (req, res) => {
       sql`SELECT COUNT(*) as count FROM students`,
       sql`SELECT COUNT(*) as count FROM academicians`,
       sql`SELECT COUNT(*) as count FROM admins`,
-      sql`SELECT COUNT(*) as count FROM courses`,
+      sql`SELECT COUNT(*) as count FROM summer_school_offerings`,
       sql`SELECT COUNT(*) as count FROM favorites`,
       sql`SELECT COUNT(*) as count FROM universities`.catch(() => [{ count: 0 }]),
     ]);

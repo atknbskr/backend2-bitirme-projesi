@@ -82,8 +82,22 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server http://0.0.0.0:${PORT} adresinde çalışıyor`);
   console.log(`📱 Android emülatör için: http://10.0.2.2:${PORT}`);
   console.log(`💻 Localhost için: http://localhost:${PORT}`);
+});
+
+// Port çakışması hatası yönetimi
+server.on('error', (error) => {
+  if (error.code === 'EADDRINUSE') {
+    console.error(`❌ Port ${PORT} zaten kullanımda!`);
+    console.error(`💡 Çözüm: Port ${PORT} kullanan process'i sonlandırın:`);
+    console.error(`   Windows: netstat -ano | findstr :${PORT}`);
+    console.error(`   Sonra: taskkill /PID <PID> /F`);
+    process.exit(1);
+  } else {
+    console.error('❌ Sunucu hatası:', error);
+    process.exit(1);
+  }
 });

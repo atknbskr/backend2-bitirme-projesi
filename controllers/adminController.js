@@ -234,13 +234,14 @@ exports.getStatistics = async (req, res) => {
   }
 };
 
-// Public istatistikler (Herkese açık - sadece öğrenci, akademisyen ve üniversite sayıları)
+// Public istatistikler (Herkese açık - öğrenci, akademisyen, üniversite ve ders sayıları)
 exports.getPublicStatistics = async (req, res) => {
   try {
-    const [students, academicians, universities] = await Promise.all([
+    const [students, academicians, universities, courses] = await Promise.all([
       sql`SELECT COUNT(*) as count FROM students`,
       sql`SELECT COUNT(*) as count FROM academicians`,
       sql`SELECT COUNT(*) as count FROM universities`.catch(() => [{ count: 0 }]),
+      sql`SELECT COUNT(*) as count FROM summer_school_offerings WHERE is_active = true`.catch(() => [{ count: 0 }]),
     ]);
 
     res.json({
@@ -249,6 +250,7 @@ exports.getPublicStatistics = async (req, res) => {
         students: parseInt(students[0].count),
         academicians: parseInt(academicians[0].count),
         universities: parseInt(universities[0].count),
+        courses: parseInt(courses[0].count),
       },
     });
   } catch (error) {

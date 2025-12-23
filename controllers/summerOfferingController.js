@@ -11,15 +11,18 @@ exports.getAllOfferings = async (req, res) => {
       maxPrice,
       startDate,
       endDate,
+      applicationStartDate,
+      applicationEndDate,
       hasAvailability,
       courseCode,
       search,
+      language,
     } = req.query;
 
     let offerings;
 
     // Basit sorgular için direkt filtreleme
-    if (!universityId && !facultyId && !city && !minPrice && !maxPrice && !startDate && !endDate && !courseCode && !search) {
+    if (!universityId && !facultyId && !city && !minPrice && !maxPrice && !startDate && !endDate && !applicationStartDate && !applicationEndDate && !courseCode && !search && !language) {
       // Filtre yok - tüm aktif teklifleri getir
       if (hasAvailability === "true") {
         offerings = await sql`
@@ -47,6 +50,7 @@ exports.getAllOfferings = async (req, res) => {
             u.type as university_type,
             f.name as faculty_name,
             usr.first_name || ' ' || usr.last_name as academician_name,
+            COALESCE(so.language, 'turkish') as language,
             (so.quota - so.current_registrations) as available_slots
           FROM summer_school_offerings so
           LEFT JOIN universities u ON so.university_id = u.id
@@ -84,6 +88,7 @@ exports.getAllOfferings = async (req, res) => {
             u.type as university_type,
             f.name as faculty_name,
             usr.first_name || ' ' || usr.last_name as academician_name,
+            COALESCE(so.language, 'turkish') as language,
             (so.quota - so.current_registrations) as available_slots
           FROM summer_school_offerings so
           LEFT JOIN universities u ON so.university_id = u.id
@@ -123,6 +128,7 @@ exports.getAllOfferings = async (req, res) => {
           u.type as university_type,
           f.name as faculty_name,
           usr.first_name || ' ' || usr.last_name as academician_name,
+          COALESCE(so.language, 'turkish') as language,
           (so.quota - so.current_registrations) as available_slots
         FROM summer_school_offerings so
         LEFT JOIN universities u ON so.university_id = u.id
@@ -143,8 +149,11 @@ exports.getAllOfferings = async (req, res) => {
         if (maxPrice && parseFloat(offering.price) > parseFloat(maxPrice)) return false;
         if (startDate && new Date(offering.start_date) < new Date(startDate)) return false;
         if (endDate && new Date(offering.end_date) > new Date(endDate)) return false;
+        if (applicationStartDate && new Date(offering.application_deadline) < new Date(applicationStartDate)) return false;
+        if (applicationEndDate && new Date(offering.application_deadline) > new Date(applicationEndDate)) return false;
         if (hasAvailability === "true" && offering.available_slots <= 0) return false;
         if (courseCode && !offering.course_code.toLowerCase().includes(courseCode.toLowerCase())) return false;
+        if (language && offering.language !== language) return false;
         if (search) {
           const searchLower = search.toLowerCase();
           const matchesName = offering.course_name?.toLowerCase().includes(searchLower);

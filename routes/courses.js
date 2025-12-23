@@ -32,6 +32,21 @@ router.get("/my-courses-with-students", authMiddleware, courseController.getMyCo
 // Derse kayıtlı öğrencileri getir (sadece akademisyen - kendi dersleri)
 router.get("/:id/students", authMiddleware, courseController.getCourseStudents);
 
+// Akademisyen: Ders başvurularını listele
+router.get("/:id/applications", authMiddleware, courseController.getCourseApplications);
+
+// Akademisyen: Başvuru durumunu güncelle (onayla/reddet)
+router.put(
+  "/:id/applications/:favoriteId/status",
+  authMiddleware,
+  [
+    body("status").notEmpty().isIn(["approved", "rejected"]).withMessage("Geçerli bir durum gerekli"),
+    body("rejectionReason").optional().isString(),
+  ],
+  validate,
+  courseController.updateApplicationStatus
+);
+
 // Yeni ders ekle (sadece akademisyen)
 router.post(
   "/",

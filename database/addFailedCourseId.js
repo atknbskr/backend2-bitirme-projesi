@@ -89,3 +89,5 @@ async function addFailedCourseIdColumn() {
 
 addFailedCourseIdColumn();
 
+
+

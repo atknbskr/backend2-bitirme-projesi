@@ -92,3 +92,5 @@ JOIN users u ON a.user_id = u.id
 GROUP BY a.id, u.first_name, u.last_name
 ORDER BY course_count DESC, a.id;
 
+
+

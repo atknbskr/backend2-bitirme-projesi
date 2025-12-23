@@ -49,3 +49,5 @@ SELECT
     COUNT(*) - COUNT(academician_id) as akademisyensiz_ders
 FROM courses;
 
+
+

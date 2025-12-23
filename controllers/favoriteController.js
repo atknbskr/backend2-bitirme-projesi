@@ -106,18 +106,13 @@ exports.addFavorite = async (req, res) => {
       });
     }
 
-    // Favoriye ekle
+    // Favoriye ekle (status: pending olarak)
     await sql`
-      INSERT INTO favorites (student_id, course_id)
-      VALUES (${student[0].id}, ${courseId})
+      INSERT INTO favorites (student_id, course_id, status)
+      VALUES (${student[0].id}, ${courseId}, 'pending')
     `;
 
-    // Öğrenci sayısını güncelle
-    await sql`
-      UPDATE courses 
-      SET student_count = student_count + 1
-      WHERE id = ${courseId}
-    `;
+    // Öğrenci sayısını güncelleme - sadece onaylandığında artırılacak
 
     res.status(201).json({
       success: true,

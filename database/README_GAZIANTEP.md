@@ -171,3 +171,9 @@ LIMIT 5;
 - SQL dosyalarındaki tarihleri güncelleyin
 - Veya seed script'teki tarihleri değiştirin
 
+
+
+
+
+
+

@@ -12,3 +12,5 @@ WHERE language IS NULL;
 -- Başarı mesajı
 SELECT 'Language alanı başarıyla eklendi! ✅' as mesaj;
 
+
+

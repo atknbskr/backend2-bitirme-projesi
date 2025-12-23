@@ -29,3 +29,9 @@ async function updateAcademiciansTable() {
 
 updateAcademiciansTable();
 
+
+
+
+
+
+

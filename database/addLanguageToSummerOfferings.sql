@@ -12,3 +12,4 @@ WHERE language IS NULL;
 -- Başarı mesajı
 SELECT 'Language alanı summer_school_offerings tablosuna başarıyla eklendi! ✅' as mesaj;
 
+

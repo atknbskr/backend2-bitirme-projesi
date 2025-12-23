@@ -26,8 +26,12 @@ router.post(
   authMiddleware,
   [
     body("offeringId").notEmpty().isInt().withMessage("Teklif ID gerekli"),
+<<<<<<< HEAD
     body("failedCourseId").optional().isInt(),
     // applicationNote için validation kaldırıldı - controller'da null kontrolü yapılıyor
+=======
+    body("applicationNote").optional().isString(),
+>>>>>>> 74d3dcc299c21998626159701ff10595da41219e
   ],
   validate,
   summerRegistrationController.createRegistration
@@ -56,4 +60,6 @@ router.put(
 );
 
 module.exports = router;
+
+
 

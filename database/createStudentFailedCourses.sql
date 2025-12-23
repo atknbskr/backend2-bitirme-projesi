@@ -21,3 +21,5 @@ ON student_failed_courses(course_code);
 
 SELECT 'student_failed_courses tablosu başarıyla oluşturuldu!' as mesaj;
 
+
+

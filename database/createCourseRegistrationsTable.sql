@@ -28,3 +28,5 @@ CREATE INDEX IF NOT EXISTS idx_course_registrations_student_id ON course_registr
 CREATE INDEX IF NOT EXISTS idx_course_registrations_status ON course_registrations(status);
 CREATE INDEX IF NOT EXISTS idx_course_registrations_application_date ON course_registrations(application_date);
 
+
+

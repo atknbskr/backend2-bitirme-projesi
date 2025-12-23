@@ -75,3 +75,5 @@ async function checkSummerRegistrationsTable() {
 
 checkSummerRegistrationsTable();
 
+
+

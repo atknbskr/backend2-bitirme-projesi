@@ -40,6 +40,7 @@ exports.getAllOfferings = async (req, res) => {
             so.equivalency_info,
             so.requirements,
             so.is_active,
+            so.udemy_link,
             so.created_at,
             u.name as university_name,
             u.city as university_city,
@@ -76,6 +77,7 @@ exports.getAllOfferings = async (req, res) => {
             so.equivalency_info,
             so.requirements,
             so.is_active,
+            so.udemy_link,
             so.created_at,
             u.name as university_name,
             u.city as university_city,
@@ -94,24 +96,9 @@ exports.getAllOfferings = async (req, res) => {
         `;
       }
     } else {
-      // Filtreler var - dinamik query oluştur
-      let conditions = [
-        sql`so.is_active = true`,
-        sql`so.application_deadline >= CURRENT_DATE`
-      ];
-      
-      if (universityId) conditions.push(sql`so.university_id = ${parseInt(universityId)}`);
-      if (facultyId) conditions.push(sql`so.faculty_id = ${parseInt(facultyId)}`);
-      if (city) conditions.push(sql`u.city = ${city}`);
-      if (minPrice) conditions.push(sql`so.price >= ${parseFloat(minPrice)}`);
-      if (maxPrice) conditions.push(sql`so.price <= ${parseFloat(maxPrice)}`);
-      if (startDate) conditions.push(sql`so.start_date >= ${startDate}`);
-      if (endDate) conditions.push(sql`so.end_date <= ${endDate}`);
-      if (hasAvailability === "true") conditions.push(sql`so.current_registrations < so.quota`);
-      if (courseCode) conditions.push(sql`so.course_code ILIKE ${"%" + courseCode + "%"}`);
-      if (search) conditions.push(sql`(so.course_name ILIKE ${"%" + search + "%"} OR so.course_code ILIKE ${"%" + search + "%"})`);
-      
-      offerings = await sql`
+      // Filtreler var - her filtre için ayrı sorgu yap (en basit çözüm)
+      // Önce tüm kayıtları al, sonra JavaScript'te filtrele
+      let allOfferings = await sql`
         SELECT 
           so.id,
           so.course_name,
@@ -129,6 +116,7 @@ exports.getAllOfferings = async (req, res) => {
           so.equivalency_info,
           so.requirements,
           so.is_active,
+          so.udemy_link,
           so.created_at,
           u.name as university_name,
           u.city as university_city,
@@ -141,9 +129,31 @@ exports.getAllOfferings = async (req, res) => {
         LEFT JOIN faculties f ON so.faculty_id = f.id
         LEFT JOIN academicians a ON so.academician_id = a.id
         LEFT JOIN users usr ON a.user_id = usr.id
-        WHERE ${sql.join(conditions, sql` AND `)}
+        WHERE so.is_active = true
+          AND so.application_deadline >= CURRENT_DATE
         ORDER BY so.application_deadline ASC, so.start_date ASC
       `;
+      
+      // JavaScript'te filtrele
+      offerings = allOfferings.filter(offering => {
+        if (universityId && offering.university_id !== parseInt(universityId)) return false;
+        if (facultyId && offering.faculty_id !== parseInt(facultyId)) return false;
+        if (city && offering.university_city !== city) return false;
+        if (minPrice && parseFloat(offering.price) < parseFloat(minPrice)) return false;
+        if (maxPrice && parseFloat(offering.price) > parseFloat(maxPrice)) return false;
+        if (startDate && new Date(offering.start_date) < new Date(startDate)) return false;
+        if (endDate && new Date(offering.end_date) > new Date(endDate)) return false;
+        if (hasAvailability === "true" && offering.available_slots <= 0) return false;
+        if (courseCode && !offering.course_code.toLowerCase().includes(courseCode.toLowerCase())) return false;
+        if (search) {
+          const searchLower = search.toLowerCase();
+          const matchesName = offering.course_name?.toLowerCase().includes(searchLower);
+          const matchesCode = offering.course_code?.toLowerCase().includes(searchLower);
+          const matchesDesc = offering.description?.toLowerCase().includes(searchLower);
+          if (!matchesName && !matchesCode && !matchesDesc) return false;
+        }
+        return true;
+      });
     }
 
     res.json({
@@ -168,6 +178,7 @@ exports.getOfferingById = async (req, res) => {
     const offering = await sql`
       SELECT 
         so.*,
+        so.udemy_link,
         u.name as university_name,
         u.city as university_city,
         u.type as university_type,
@@ -225,6 +236,7 @@ exports.getMyOfferings = async (req, res) => {
     const offerings = await sql`
       SELECT 
         so.*,
+        so.udemy_link,
         u.name as university_name,
         u.city as university_city,
         f.name as faculty_name,
@@ -274,6 +286,7 @@ exports.createOffering = async (req, res) => {
       language,
       equivalencyInfo,
       requirements,
+      udemyLink,
     } = req.body;
 
     // Validasyon
@@ -333,7 +346,8 @@ exports.createOffering = async (req, res) => {
         quota,
         language,
         equivalency_info,
-        requirements
+        requirements,
+        udemy_link
       )
       VALUES (
         ${courseId || null},
@@ -353,7 +367,8 @@ exports.createOffering = async (req, res) => {
         ${quota || 30},
         ${language || 'turkish'},
         ${equivalencyInfo || null},
-        ${requirements || null}
+        ${requirements || null},
+        ${udemyLink || null}
       )
       RETURNING *
     `;
@@ -433,6 +448,7 @@ exports.updateOffering = async (req, res) => {
         language = COALESCE(${updateData.language}, language),
         equivalency_info = COALESCE(${updateData.equivalencyInfo}, equivalency_info),
         requirements = COALESCE(${updateData.requirements}, requirements),
+        udemy_link = COALESCE(${updateData.udemyLink}, udemy_link),
         is_active = COALESCE(${updateData.isActive}, is_active),
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ${offeringId}

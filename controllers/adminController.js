@@ -575,6 +575,7 @@ exports.getAcademicians = async (req, res) => {
   try {
     const academicians = await sql`
       SELECT 
+        a.id as academician_id,
         u.id as user_id,
         u.first_name,
         u.last_name,

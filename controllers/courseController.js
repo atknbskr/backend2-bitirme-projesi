@@ -514,37 +514,54 @@ exports.updateCourse = async (req, res) => {
     if (userType === 'admin') {
       // Üniversite ID değiştiriliyorsa kontrol et
       if (universityId !== undefined && universityId !== null && universityId !== '') {
-        const university = await sql`SELECT id FROM universities WHERE id = ${universityId}`;
+        // String'i integer'a çevir
+        const universityIdInt = parseInt(universityId);
+        if (isNaN(universityIdInt)) {
+          return res.status(400).json({
+            success: false,
+            message: "Geçersiz üniversite ID formatı",
+          });
+        }
+        
+        const university = await sql`SELECT id FROM universities WHERE id = ${universityIdInt}`;
         if (university.length === 0) {
           return res.status(400).json({
             success: false,
             message: "Geçersiz üniversite ID",
           });
         }
-        finalUniversityId = universityId;
+        finalUniversityId = universityIdInt;
       }
       
       // Akademisyen ID değiştiriliyorsa kontrol et
-      if (academicianId !== undefined) {
-        if (academicianId === null || academicianId === '') {
-          finalAcademicianId = null;
-          // Üniversite ID değiştirilmediyse null yap
-          if (universityId === undefined) {
-            finalUniversityId = null;
-          }
-        } else {
-          const academician = await sql`SELECT id, university_id FROM academicians WHERE id = ${academicianId}`;
-          if (academician.length === 0) {
-            return res.status(400).json({
-              success: false,
-              message: "Geçersiz akademisyen ID",
-            });
-          }
-          finalAcademicianId = academicianId;
-          // Üniversite ID manuel olarak değiştirilmediyse akademisyenin üniversitesini kullan
-          if (universityId === undefined) {
-            finalUniversityId = academician[0].university_id;
-          }
+      if (academicianId !== undefined && academicianId !== null && academicianId !== '') {
+        // String'i integer'a çevir
+        const academicianIdInt = parseInt(academicianId);
+        if (isNaN(academicianIdInt)) {
+          return res.status(400).json({
+            success: false,
+            message: "Geçersiz akademisyen ID formatı",
+          });
+        }
+        
+        const academician = await sql`SELECT id, university_id FROM academicians WHERE id = ${academicianIdInt}`;
+        if (academician.length === 0) {
+          return res.status(400).json({
+            success: false,
+            message: "Geçersiz akademisyen ID",
+          });
+        }
+        finalAcademicianId = academicianIdInt;
+        // Üniversite ID manuel olarak değiştirilmediyse akademisyenin üniversitesini kullan
+        if (universityId === undefined || universityId === null || universityId === '') {
+          finalUniversityId = academician[0].university_id;
+        }
+      } else if (academicianId === null || academicianId === '') {
+        // Akademisyen null veya boş string ise
+        finalAcademicianId = null;
+        // Üniversite ID değiştirilmediyse null yap
+        if (universityId === undefined || universityId === null || universityId === '') {
+          finalUniversityId = null;
         }
       }
     } else {

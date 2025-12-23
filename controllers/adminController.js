@@ -266,7 +266,7 @@ exports.getPublicStatistics = async (req, res) => {
 exports.updateUser = async (req, res) => {
   try {
     const userId = req.params.id;
-    const { firstName, lastName, email, identifier } = req.body;
+    const { firstName, lastName, email, identifier, title } = req.body;
 
     // Kullanıcıyı bul
     const user = await sql`SELECT id, user_type FROM users WHERE id = ${userId}`;
@@ -336,6 +336,15 @@ exports.updateUser = async (req, res) => {
           WHERE user_id = ${userId}
         `;
       }
+    }
+
+    // Akademisyen için ünvan güncelle
+    if (userType === 'academician' && title !== undefined) {
+      await sql`
+        UPDATE academicians 
+        SET title = ${title || null}
+        WHERE user_id = ${userId}
+      `;
     }
 
     res.json({
@@ -611,6 +620,7 @@ exports.getAcademicians = async (req, res) => {
         u.last_name,
         u.email,
         a.username,
+        a.title,
         a.university_id,
         uni.name as university_name,
         u.created_at

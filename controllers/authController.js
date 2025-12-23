@@ -134,7 +134,7 @@ exports.studentLogin = async (req, res) => {
 // Akademisyen Kayıt
 exports.academicianRegister = async (req, res) => {
   try {
-    const { email, password, firstName, lastName, username, universityId } = req.body;
+    const { email, password, firstName, lastName, username, universityId, title } = req.body;
 
     // Üniversite ID kontrolü
     if (!universityId) {
@@ -185,8 +185,8 @@ exports.academicianRegister = async (req, res) => {
 
     // Akademisyen kaydı oluştur
     await sql`
-      INSERT INTO academicians (user_id, username, university_id)
-      VALUES (${newUser[0].id}, ${username}, ${universityId})
+      INSERT INTO academicians (user_id, username, university_id, title)
+      VALUES (${newUser[0].id}, ${username}, ${universityId}, ${title || null})
     `;
 
     // Token oluştur

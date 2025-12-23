@@ -51,6 +51,7 @@ exports.getAllOfferings = async (req, res) => {
             u.type as university_type,
             f.name as faculty_name,
             usr.first_name || ' ' || usr.last_name as academician_name,
+            a.title as academician_title,
             COALESCE(so.language, 'turkish') as language,
             (so.quota - so.current_registrations) as available_slots
           FROM summer_school_offerings so
@@ -89,6 +90,7 @@ exports.getAllOfferings = async (req, res) => {
             u.type as university_type,
             f.name as faculty_name,
             usr.first_name || ' ' || usr.last_name as academician_name,
+            a.title as academician_title,
             COALESCE(so.language, 'turkish') as language,
             (so.quota - so.current_registrations) as available_slots
           FROM summer_school_offerings so

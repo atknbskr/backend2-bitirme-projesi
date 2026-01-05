@@ -274,3 +274,6 @@ exports.deleteFaculty = async (req, res) => {
 
 
 
+
+
+

@@ -36,3 +36,6 @@ CREATE INDEX IF NOT EXISTS idx_course_registrations_application_date ON course_r
 
 
 
+
+
+

@@ -26,3 +26,6 @@ SELECT 'Bildirimler tablosu başarıyla oluşturuldu!' as mesaj;
 
 
 
+
+
+

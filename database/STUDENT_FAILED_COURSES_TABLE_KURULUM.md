@@ -52,3 +52,6 @@ Controller dosyası güncellendi ve artık tablo yoksa bile çalışacak şekild
 
 
 
+
+
+

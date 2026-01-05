@@ -13,16 +13,16 @@ const createTransporter = () => {
         pass: process.env.SMTP_PASS,
       },
     });
-  } 
+  }
   // Gmail için ayarlar
   else if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
     // Gmail App Password'un boşluk içermediğinden emin ol
     const appPassword = process.env.GMAIL_APP_PASSWORD.replace(/\s/g, '');
-    
+
     if (appPassword.length !== 16) {
       console.warn("⚠️ UYARI: Gmail App Password 16 karakter olmalıdır. Mevcut uzunluk:", appPassword.length);
     }
-    
+
     return nodemailer.createTransport({
       service: "gmail",
       auth: {
@@ -84,7 +84,7 @@ Bu mesaj otomatik olarak gönderilmiştir. Lütfen gönderenin e-posta adresine 
 
     // E-posta transporter'ı oluştur
     const transporter = createTransporter();
-    
+
     // E-posta ayarları kontrolü
     if (!transporter) {
       console.error("E-posta ayarları bulunamadı! Lütfen .env dosyasına GMAIL_USER ve GMAIL_APP_PASSWORD veya SMTP ayarlarını ekleyin.");
@@ -132,10 +132,10 @@ Bu mesaj otomatik olarak gönderilmiştir. Lütfen gönderenin e-posta adresine 
     });
   } catch (error) {
     console.error("E-posta gönderme hatası:", error);
-    
+
     // Gmail kimlik doğrulama hatası için özel mesaj
     let errorMessage = "E-posta gönderilirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.";
-    
+
     if (error.code === 'EAUTH' || error.responseCode === 535) {
       errorMessage = "Gmail kimlik doğrulama hatası! Lütfen .env dosyasındaki GMAIL_USER ve GMAIL_APP_PASSWORD değerlerini kontrol edin. Gmail App Password kullanmanız gerekiyor (normal şifre çalışmaz). Detaylar için backend/EMAIL_SETUP.md dosyasına bakın.";
       console.error("Gmail kimlik doğrulama hatası - Muhtemel nedenler:");
@@ -146,7 +146,7 @@ Bu mesaj otomatik olarak gönderilmiştir. Lütfen gönderenin e-posta adresine 
     } else if (error.code === 'ECONNECTION' || error.code === 'ETIMEDOUT') {
       errorMessage = "E-posta sunucusuna bağlanılamadı. Lütfen internet bağlantınızı kontrol edin.";
     }
-    
+
     res.status(500).json({
       success: false,
       message: errorMessage,

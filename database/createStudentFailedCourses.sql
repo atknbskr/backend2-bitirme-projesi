@@ -35,3 +35,4 @@ SELECT 'student_failed_courses tablosu başarıyla oluşturuldu!' as mesaj;
 
 
 
+

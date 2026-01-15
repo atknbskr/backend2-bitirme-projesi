@@ -96,3 +96,4 @@ ORDER BY ders_sayisi DESC, a.id;
 
 
 
+

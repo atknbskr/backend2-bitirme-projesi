@@ -34,3 +34,4 @@ SELECT 'Fakülteler tablosu başarıyla oluşturuldu!' as mesaj;
 
 
 
+
